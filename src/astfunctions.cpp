@@ -21,10 +21,16 @@ std::string ASTFunctions::getDefaultStrideRoot() {
   if (strideroot) {
     return std::string(strideroot);
   } else {
-    auto abspath = std::filesystem::canonical(
-        std::filesystem::absolute(std::filesystem::current_path().string() +
-                                  "/../../../Stride/strideroot"));
-    //    std::cout << abspath.string() << std::endl;
+    std::filesystem::path abspath;
+    try {
+      abspath = std::filesystem::canonical(
+          std::filesystem::absolute(std::filesystem::current_path().string() +
+                                    "/../../../Stride/strideroot"));
+      //    std::cout << abspath.string() << std::endl;
+    } catch (...) {
+      std::cerr << "ERROR: Can't find strideroot and STRIDEROOT not set."
+                << std::endl;
+    }
     return abspath.string();
   }
 }
