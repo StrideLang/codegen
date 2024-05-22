@@ -4,7 +4,6 @@ project(StrideCodegen)
 ########## Code generation
 
 set(CODEGEN_SRC 
-#  pythonproject.cpp
   src/astfunctions.cpp
   src/astquery.cpp
   src/astvalidation.cpp
@@ -22,8 +21,6 @@ set(CODEGEN_SRC
 )
 
 set(CODEGEN_HEADERS
-#  pythonproject.h
-#  builder.h
   include/stride/codegen/astfunctions.hpp
   include/stride/codegen/astquery.hpp
   include/stride/codegen/astruntime.hpp

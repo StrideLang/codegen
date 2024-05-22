@@ -752,6 +752,7 @@ void ASTValidation::validateConstrainedList(
       }
     }
     if (auto uniqueNode = constrainDecl->getPropertyValue("uniqueItems")) {
+      // All items in list must be unique
       if (uniqueNode->getNodeType() == AST::Switch &&
           std::static_pointer_cast<ValueNode>(uniqueNode)->getSwitchValue() ==
               true) {
@@ -781,56 +782,54 @@ void ASTValidation::validateConstrainedList(
     }
     if (auto allowedNode = constrainDecl->getPropertyValue("allowed")) {
       if (allowedNode->getNodeType() == AST::List) {
-        bool repeated = false;
-        std::unordered_set<std::string> previous;
-        for (const auto &node : portValue->getChildren()) {
-          auto newString = AST::toText(node, 0, 0, false);
-          if (previous.find(newString) != previous.end()) {
-            repeated = true;
-            break;
-          }
-          previous.insert(newString);
-        }
+        auto allowedTypes = allowedNode->getChildren();
         std::vector<ASTNode> failed;
         for (const auto &node : portValue->getChildren()) {
+
+          auto validTypes =
+              getValidTypeNames(allowedTypes, scopeStack, tree, parentNamespace,
+                                currentFramework);
           if (node->getNodeType() == AST::Declaration) {
             auto constraintDecl =
                 std::static_pointer_cast<DeclarationNode>(node);
-            if (constraintDecl->getObjectType() == "anyOf") {
-            }
 
           } else if (node->getNodeType() == AST::Block) {
             auto blockName =
                 std::static_pointer_cast<BlockNode>(node)->getName();
-            if (getTypeName(node, scopeStack, tree, parentNamespace,
-                            currentFramework) != blockName) {
+            auto decl = ASTQuery::findDeclarationByName(
+                blockName, scopeStack, tree, parentNamespace, currentFramework);
+            bool checkFailed = false;
+            if (!decl) {
+              checkFailed = true;
+            } else {
+              auto declType = decl->getObjectType();
+              auto typeDeclaration = ASTQuery::findTypeDeclarationByName(
+                  declType, scopeStack, tree, parentNamespace,
+                  currentFramework);
+              if (std::find(validTypes.begin(), validTypes.end(),
+                            typeDeclaration->getName()) == validTypes.end()) {
+
+                checkFailed = true;
+              }
+            }
+            if (checkFailed) {
+
               LangError error;
               error.lineNumber = portValue->getLine();
               error.filename = portValue->getFilename();
               error.type = LangError::ConstraintFail;
               error.errorTokens.push_back(declaration->getObjectType());
-              error.errorTokens.push_back(portName);
-              error.errorTokens.push_back(blockName);
+              error.errorTokens.push_back(AST::toText(allowedNode));
+              error.errorTokens.push_back(AST::toText(node));
               error.errorTokens.push_back(AST::toText(portValue));
               errors.push_back(error);
             }
           }
         }
-
-        if (repeated) {
-          LangError error;
-          error.lineNumber = portValue->getLine();
-          error.filename = portValue->getFilename();
-          error.type = LangError::ConstraintFail;
-          error.errorTokens.push_back(declaration->getObjectType());
-          error.errorTokens.push_back(portName);
-          error.errorTokens.push_back(AST::toText(constrainDecl));
-          error.errorTokens.push_back(AST::toText(portValue));
-          errors.push_back(error);
-        }
-      } else {
-        std::cerr << "ERROR expecting list for allowed in constrainedList"
-                  << std::endl;
+      } else if (!allowedNode->getNodeType() == AST::None) {
+        std::cerr
+            << "ERROR expecting list or none for allowed in constrainedList"
+            << std::endl;
       }
     }
   }
