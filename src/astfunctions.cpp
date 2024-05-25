@@ -945,6 +945,7 @@ int64_t ASTFunctions::evaluateConstInteger(ASTNode node, ScopeStack scope,
   if (node->getNodeType() == AST::Int) {
     return static_cast<ValueNode *>(node.get())->getIntValue();
   } else if (node->getNodeType() == AST::Bundle) {
+    // FIXME this seems to be evaluating the bundle index??
     BundleNode *bundle = static_cast<BundleNode *>(node.get());
     ListNode *indexList = bundle->index().get();
     if (indexList->size() == 1) {

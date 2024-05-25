@@ -577,8 +577,11 @@ std::vector<Builder *> StrideSystem::createBuilders(std::string fileName,
 ASTNode StrideSystem::getPlatformDomain(std::string namespaceName) {
   ASTNode platformDomain;
   std::map<std::string, std::vector<ASTNode>> libObjects = getImportTrees();
-  if (libObjects.find(namespaceName) == libObjects.end()) { // Invalid namespace
-    assert(0 == 1);
+  if (libObjects.find(namespaceName) == libObjects.end()) {
+    if (libObjects.size() > 0) {
+      assert(0 == 1);
+      // Invalid namespace
+    }
     return platformDomain;
   }
   for (const ASTNode &object : libObjects[namespaceName]) {

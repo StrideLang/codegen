@@ -1971,8 +1971,9 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
                   if (!blockDomain || blockDomain->getNodeType() == AST::None) {
                     blockDecl->setPropertyValue("domain", portDomain);
                   }
-                  if (blockDecl->getPropertyValue("rate")->getNodeType() ==
-                      AST::None) {
+                  if (!blockDecl->getPropertyValue("rate") ||
+                      blockDecl->getPropertyValue("rate")->getNodeType() ==
+                          AST::None) {
                     blockDecl->setPropertyValue("rate", portRate);
                   }
                 }

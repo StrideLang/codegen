@@ -1468,7 +1468,10 @@ int CodeAnalysis::getNodeNumInputs(ASTNode node, ScopeStack scope, ASTNode tree,
     }
     return size;
   } else if (node->getNodeType() == AST::PortProperty) {
-    std::cerr << "Unexpected write to port portperty" << std::endl;
+    auto pp = std::static_pointer_cast<PortPropertyNode>(node);
+    if (pp->getName() == "") {
+      // TODO If it's a local port, we should be able to determine size
+    }
   } else if (node->getNodeType() == AST::Declaration ||
              node->getNodeType() == AST::BundleDeclaration) {
     return getTypeNumInputs(std::static_pointer_cast<DeclarationNode>(node),

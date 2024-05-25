@@ -781,11 +781,11 @@ void ASTValidation::validateConstrainedList(
       }
     }
     if (auto allowedNode = constrainDecl->getPropertyValue("allowed")) {
-      if (allowedNode->getNodeType() == AST::List) {
+      if (allowedNode->getNodeType() == AST::List &&
+          allowedNode->getChildren().size() > 0) {
         auto allowedTypes = allowedNode->getChildren();
         std::vector<ASTNode> failed;
         for (const auto &node : portValue->getChildren()) {
-
           auto validTypes =
               getValidTypeNames(allowedTypes, scopeStack, tree, parentNamespace,
                                 currentFramework);
