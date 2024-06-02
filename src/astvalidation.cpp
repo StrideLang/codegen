@@ -781,52 +781,55 @@ void ASTValidation::validateConstrainedList(
       }
     }
     if (auto allowedNode = constrainDecl->getPropertyValue("allowed")) {
-      if (allowedNode->getNodeType() == AST::List &&
-          allowedNode->getChildren().size() > 0) {
-        auto allowedTypes = allowedNode->getChildren();
-        std::vector<ASTNode> failed;
-        for (const auto &node : portValue->getChildren()) {
-          auto validTypes =
-              getValidTypeNames(allowedTypes, scopeStack, tree, parentNamespace,
-                                currentFramework);
-          if (node->getNodeType() == AST::Declaration) {
-            auto constraintDecl =
-                std::static_pointer_cast<DeclarationNode>(node);
+      if (allowedNode->getNodeType() == AST::List) {
+        // Empty list means anything is allowed, so no need to check
+        if (allowedNode->getChildren().size() > 0) {
+          auto allowedTypes = allowedNode->getChildren();
+          std::vector<ASTNode> failed;
+          for (const auto &node : portValue->getChildren()) {
+            auto validTypes =
+                getValidTypeNames(allowedTypes, scopeStack, tree,
+                                  parentNamespace, currentFramework);
+            if (node->getNodeType() == AST::Declaration) {
+              auto constraintDecl =
+                  std::static_pointer_cast<DeclarationNode>(node);
 
-          } else if (node->getNodeType() == AST::Block) {
-            auto blockName =
-                std::static_pointer_cast<BlockNode>(node)->getName();
-            auto decl = ASTQuery::findDeclarationByName(
-                blockName, scopeStack, tree, parentNamespace, currentFramework);
-            bool checkFailed = false;
-            if (!decl) {
-              checkFailed = true;
-            } else {
-              auto declType = decl->getObjectType();
-              auto typeDeclaration = ASTQuery::findTypeDeclarationByName(
-                  declType, scopeStack, tree, parentNamespace,
-                  currentFramework);
-              if (std::find(validTypes.begin(), validTypes.end(),
-                            typeDeclaration->getName()) == validTypes.end()) {
-
+            } else if (node->getNodeType() == AST::Block) {
+              auto blockName =
+                  std::static_pointer_cast<BlockNode>(node)->getName();
+              auto decl = ASTQuery::findDeclarationByName(blockName, scopeStack,
+                                                          tree, parentNamespace,
+                                                          currentFramework);
+              bool checkFailed = false;
+              if (!decl) {
                 checkFailed = true;
-              }
-            }
-            if (checkFailed) {
+              } else {
+                auto declType = decl->getObjectType();
+                auto typeDeclaration = ASTQuery::findTypeDeclarationByName(
+                    declType, scopeStack, tree, parentNamespace,
+                    currentFramework);
+                if (std::find(validTypes.begin(), validTypes.end(),
+                              typeDeclaration->getName()) == validTypes.end()) {
 
-              LangError error;
-              error.lineNumber = portValue->getLine();
-              error.filename = portValue->getFilename();
-              error.type = LangError::ConstraintFail;
-              error.errorTokens.push_back(declaration->getObjectType());
-              error.errorTokens.push_back(AST::toText(allowedNode));
-              error.errorTokens.push_back(AST::toText(node));
-              error.errorTokens.push_back(AST::toText(portValue));
-              errors.push_back(error);
+                  checkFailed = true;
+                }
+              }
+              if (checkFailed) {
+
+                LangError error;
+                error.lineNumber = portValue->getLine();
+                error.filename = portValue->getFilename();
+                error.type = LangError::ConstraintFail;
+                error.errorTokens.push_back(declaration->getObjectType());
+                error.errorTokens.push_back(AST::toText(allowedNode));
+                error.errorTokens.push_back(AST::toText(node));
+                error.errorTokens.push_back(AST::toText(portValue));
+                errors.push_back(error);
+              }
             }
           }
         }
-      } else if (!allowedNode->getNodeType() == AST::None) {
+      } else if (allowedNode->getNodeType() != AST::None) {
         std::cerr
             << "ERROR expecting list or none for allowed in constrainedList"
             << std::endl;

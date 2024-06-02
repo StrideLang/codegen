@@ -2040,9 +2040,27 @@ void CodeResolver::resolveStreamSymbols() {
     } else if (node->getNodeType() == AST::Declaration) {
       std::shared_ptr<DeclarationNode> decl =
           std::static_pointer_cast<DeclarationNode>(node);
-      if (decl->getObjectType() == "module" ||
-          decl->getObjectType() == "reaction" ||
-          decl->getObjectType() == "loop") {
+      // "module", "loop" and "reaction" inherit from _CodeGenerator. The user
+      // can also inherit from _CodeGenerator to force parsing and code
+      // resolution for streams and blocks in their types
+      ScopeStack scope;
+      auto typeDecl = ASTQuery::findTypeDeclarationByName(decl->getObjectType(),
+                                                          scope, m_tree);
+      bool isCodeGenerator = false;
+      if (typeDecl) {
+        auto inheritsProp = typeDecl->getPropertyValue("inherits");
+        if (inheritsProp) {
+          for (const auto &inheritsNode : inheritsProp->getChildren()) {
+            if (inheritsNode && inheritsNode->getNodeType() == AST::Block &&
+                std::static_pointer_cast<BlockNode>(inheritsNode)->getName() ==
+                    "_CodeGenerator") {
+              isCodeGenerator = true;
+              break;
+            }
+          }
+        }
+      }
+      if (isCodeGenerator) {
         std::vector<ASTNode> streams = getModuleStreams(decl);
         ScopeStack scopeStack;
         ASTNode blocks = decl->getPropertyValue("blocks");

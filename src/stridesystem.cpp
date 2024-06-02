@@ -59,6 +59,11 @@ StrideSystem::StrideSystem(std::string strideRoot, std::string systemName,
                            std::vector<std::shared_ptr<ImportNode>> importList)
     : m_strideRoot(strideRoot), m_systemName(systemName),
       m_majorVersion(majorVersion), m_minorVersion(minorVersion) {
+
+  if (systemName.size() == 0) {
+    std::cerr << __FILE__ << ":" << __LINE__ << " WARNING: No System specified"
+              << std::endl;
+  }
   std::string versionString =
       std::to_string(m_majorVersion) + "." + std::to_string(m_minorVersion);
 
@@ -120,7 +125,7 @@ StrideSystem::StrideSystem(std::string strideRoot, std::string systemName,
     }
   } else {
     std::cerr << __FILE__ << ":" << __LINE__
-              << "System file not found:" << systemFile << std::endl;
+              << " System file not found:" << systemFile << std::endl;
   }
 
   //    if (m_api == NullPlatform) {
