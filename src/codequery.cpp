@@ -165,6 +165,7 @@ std::string
 CodeQuery::resolvePortPropertyDataType(PortPropertyNode *portproperty,
                                        ScopeStack scopeStack, ASTNode tree) {
   // FIXME implement correctly. Should be read from framework?
+    // Should call CodeResolver::resolvePortProperty then get type
   if (portproperty->getPortName() == "size") {
     return "_IntType";
   } else if (portproperty->getPortName() == "rate") {

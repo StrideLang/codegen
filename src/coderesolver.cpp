@@ -1165,7 +1165,7 @@ ASTNode CodeResolver::processDomainsForNode(ASTNode node, ScopeStack scopeStack,
       }
       if (node->getNodeType() == AST::Bundle) {
         auto indexNode = std::static_pointer_cast<BundleNode>(node)->index();
-        for (auto indexElement : indexNode->getChildren()) {
+        for (const auto &indexElement : indexNode->getChildren()) {
           resolveDomainForStreamNode(indexElement, scopeStack);
           std::vector<ASTNode> indexDomainStack;
           processDomainsForNode(indexElement, scopeStack, indexDomainStack);
@@ -2779,6 +2779,7 @@ ASTNode CodeResolver::resolvePortProperty(
   if (decl) {
     resolved = decl->getPropertyValue(portProperty->getName());
     if (resolved && resolved->getNodeType() == AST::PortProperty) {
+        // Resolve port property recursively
       auto resolvedPortProperty =
           std::static_pointer_cast<PortPropertyNode>(resolved);
       if (decl->getName() !=
