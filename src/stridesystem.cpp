@@ -152,7 +152,6 @@ StrideSystem::listAvailableSystems(std::string strideroot) {
 void StrideSystem::parseSystemTree(ASTNode systemTree, ASTNode configuration) {
   std::vector<std::pair<std::string, std::string>> usedPlatformNames;
   std::vector<std::map<std::string, std::string>> platformDefinitions;
-  std::map<std::string, std::pair<std::string, std::string>> frameworkInherits;
   //    vector<string> platformDefinitionNames;
   std::vector<AST *>
       connectionDefinitions; // TODO process connection definitions
@@ -175,6 +174,7 @@ void StrideSystem::parseSystemTree(ASTNode systemTree, ASTNode configuration) {
         platformDefinitions.push_back(definition);
         m_platformDefinitions.push_back(
             std::static_pointer_cast<DeclarationNode>(declaration));
+
       } else if (declaration->getObjectType() == "connection") {
         m_connectionDefinitions.push_back(declaration);
       } else if (declaration->getObjectType() == "system") {
@@ -289,9 +289,7 @@ void StrideSystem::parseSystemTree(ASTNode systemTree, ASTNode configuration) {
             std::make_shared<StrideFramework>(
                 m_strideRoot, definition["framework"],
                 definition["frameworkVersion"], definition["hardware"],
-                definition["hardwareVersion"], definition["rootNamespace"],
-                frameworkInherits[definition["framework"]].first,
-                frameworkInherits[definition["framework"]].second);
+                definition["hardwareVersion"], definition["rootNamespace"]);
 
         m_frameworks.push_back(newPlatform);
       } else {
@@ -889,14 +887,14 @@ StrideSystem::getFrameworkOperators(std::string frameworkName) {
   return operators;
 }
 
-std::vector<std::string>
+std::vector<std::pair<std::string, std::string>>
 StrideSystem::getFrameworkAliasInherits(std::string frameworkAlias) {
   for (const auto &fw : m_frameworks) {
     if (fw->getRootNamespace() == frameworkAlias) {
       return fw->getInheritedList();
     }
   }
-  return std::vector<std::string>{};
+  return std::vector<std::pair<std::string, std::string>>();
 }
 
 std::string StrideSystem::getDataType(ASTNode node, ASTNode tree) {

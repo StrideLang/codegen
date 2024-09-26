@@ -382,9 +382,8 @@ std::string LanguageSyntax::getDataType(std::shared_ptr<DeclarationNode> decl,
       system->getFrameworkDataType(frameworkName, defaultDataType);
 
   if (!dataTypeNode || dataTypeNode->getNodeType() == AST::None) {
-    // Fallback, but should never get here...
-    std::cerr << "ERROR, undefined data type for " << decl->getObjectType()
-              << std::endl;
+    // std::cout << "undefined data type for " << decl->getObjectType()
+    //           << ". Using framework default." << std::endl;
     defaultDataType = system->getFrameworkDefaultDataType(frameworkName, "");
     dataTypeNode = system->getFrameworkDataType(frameworkName, defaultDataType);
   }

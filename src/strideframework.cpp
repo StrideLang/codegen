@@ -32,17 +32,16 @@
     Authors: Andres Cabrera and Joseph Tilbian
 */
 
-#include "stride/codegen/strideframework.hpp"
-
-//#include <QProcess>
-
 #include <array>
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <string>
+#include <vector>
 
 #include "stride/codegen/astfunctions.hpp"
 #include "stride/codegen/astquery.hpp"
+#include "stride/codegen/strideframework.hpp"
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/valuenode.h"
 
@@ -51,13 +50,10 @@ using namespace std;
 StrideFramework::StrideFramework(std::string strideRoot, std::string framework,
                                  std::string fwVersion, std::string hardware,
                                  std::string hardwareVersion,
-                                 std::string rootNamespace,
-                                 std::string inherits,
-                                 std::string inheritsVersion)
+                                 std::string rootNamespace)
     : m_strideRoot(strideRoot), m_framework(framework),
       m_frameworkVersion(fwVersion), m_hardware(hardware),
-      m_hardwareVersion(hardwareVersion), m_rootNamespace(rootNamespace),
-      m_inherits(inherits), m_inheritsVersion(inheritsVersion) {
+      m_hardwareVersion(hardwareVersion), m_rootNamespace(rootNamespace) {
   m_inheritedPaths = getInheritedFrameworkPaths(buildPlatformLibPath());
   m_inheritedList = loadInheritedList(buildPlatformLibPath());
   auto nodes = loadFrameworkRoot(buildPlatformLibPath());
@@ -110,107 +106,120 @@ std::string StrideFramework::getPlatformDetails() {
 }
 
 void StrideFramework::installFramework() {
-  auto frameworkRoot = buildPlatformLibPath();
-  auto fileName = frameworkRoot + "/Configuration.stride";
-  auto configuration = AST::parseFile(fileName.c_str());
-  if (configuration) {
-    for (const auto &node : configuration->getChildren()) {
-      if (node->getNodeType() == AST::Declaration) {
-        auto decl = std::static_pointer_cast<DeclarationNode>(node);
-        auto installationNode = decl->getPropertyValue("installation");
-        if (installationNode) {
-          for (const auto &installDirectiveNode :
-               installationNode->getChildren()) {
-            if (installDirectiveNode->getNodeType() == AST::Declaration) {
-              auto installDirective = std::static_pointer_cast<DeclarationNode>(
-                  installDirectiveNode);
-              if (installDirective->getObjectType() == "installAction") {
-                // FIXME check for platform and language
-                auto commandNode =
-                    installDirective->getPropertyValue("command");
-                auto dirNode =
-                    installDirective->getPropertyValue("workingDirectory");
-                if (commandNode && commandNode->getNodeType() == AST::String &&
-                    dirNode) {
-                  std::string workingDirectory = buildPlatformPath();
-                  if (dirNode->getNodeType() == AST::String) {
-                    workingDirectory +=
-                        "/" + std::static_pointer_cast<ValueNode>(dirNode)
-                                  ->getStringValue();
-                  }
-                  auto command =
-                      std::static_pointer_cast<ValueNode>(commandNode)
-                          ->getStringValue();
-                  std::cerr << "Running command: " << command << " IN "
-                            << workingDirectory << std::endl;
-                  //                  QObject::connect(
-                  //                      &installProcess,
-                  //                      &QProcess::readyReadStandardOutput,
-                  //                      [&]() {
-                  //                        qDebug() <<
-                  //                        installProcess.readAllStandardOutput();
-                  //                      });
-                  //                  QObject::connect(
-                  //                      &installProcess,
-                  //                      &QProcess::readyReadStandardError,
-                  //                      [&]() {
-                  //                        qDebug() <<
-                  //                        installProcess.readAllStandardError();
-                  //                      });
-                  //                  installProcess.start(QString::fromStdString(command),
-                  //                                       QStringList());
-                  auto previousPath = std::filesystem::current_path();
-                  std::filesystem::current_path(workingDirectory);
+  std::vector<std::string> frameworkRoots;
+  frameworkRoots.push_back(buildPlatformLibPath());
+
+  for (const auto &inh : m_inheritedList) {
+    std::string path = m_strideRoot + "/";
+    path += "frameworks/" + inh.first + "/" + inh.second + "/";
+    path += "platformlib";
+    frameworkRoots.push_back(path);
+  }
+
+  for (const auto frameworkRoot : frameworkRoots) {
+    auto fileName = frameworkRoot + "/Configuration.stride";
+    auto configuration = AST::parseFile(fileName.c_str());
+    if (configuration) {
+      for (const auto &node : configuration->getChildren()) {
+        if (node->getNodeType() == AST::Declaration) {
+          auto decl = std::static_pointer_cast<DeclarationNode>(node);
+          auto installationNode = decl->getPropertyValue("installation");
+          if (installationNode) {
+            for (const auto &installDirectiveNode :
+                 installationNode->getChildren()) {
+              if (installDirectiveNode->getNodeType() == AST::Declaration) {
+                auto installDirective =
+                    std::static_pointer_cast<DeclarationNode>(
+                        installDirectiveNode);
+                if (installDirective->getObjectType() == "installAction") {
+                  // FIXME check for platform and language
+                  auto commandNode =
+                      installDirective->getPropertyValue("command");
+                  auto dirNode =
+                      installDirective->getPropertyValue("workingDirectory");
+                  if (commandNode &&
+                      commandNode->getNodeType() == AST::String && dirNode) {
+                    std::string workingDirectory = buildPlatformPath();
+                    if (dirNode->getNodeType() == AST::String) {
+                      workingDirectory +=
+                          "/" + std::static_pointer_cast<ValueNode>(dirNode)
+                                    ->getStringValue();
+                    }
+                    auto command =
+                        std::static_pointer_cast<ValueNode>(commandNode)
+                            ->getStringValue();
+                    std::cerr << "Running command: " << command << " IN "
+                              << workingDirectory << std::endl;
+                    //                  QObject::connect(
+                    //                      &installProcess,
+                    //                      &QProcess::readyReadStandardOutput,
+                    //                      [&]() {
+                    //                        qDebug() <<
+                    //                        installProcess.readAllStandardOutput();
+                    //                      });
+                    //                  QObject::connect(
+                    //                      &installProcess,
+                    //                      &QProcess::readyReadStandardError,
+                    //                      [&]() {
+                    //                        qDebug() <<
+                    //                        installProcess.readAllStandardError();
+                    //                      });
+                    //                  installProcess.start(QString::fromStdString(command),
+                    //                                       QStringList());
+                    auto previousPath = std::filesystem::current_path();
+                    std::filesystem::current_path(workingDirectory);
 #ifdef Q_OS_LINUX
-                  FILE *pipe = popen(command.c_str(), "r");
-                  if (pipe) {
-                    char buffer[128];
-                    std::string result = "";
-                    // read till end of process:
-                    while (!feof(pipe)) {
-                      // use buffer to read and add to result
-                      if (fgets(buffer, 128, pipe) != NULL)
-                        result += buffer;
-                    }
-                    auto ret = pclose(pipe);
-                    if (WIFEXITED(ret)) {
-                      if (WEXITSTATUS(ret) != 0) {
-                        std::cerr << "ERROR executing : " << command
-                                  << std::endl;
-                        std::cerr << result << std::endl;
+                    FILE *pipe = popen(command.c_str(), "r");
+                    if (pipe) {
+                      char buffer[128];
+                      std::string result = "";
+                      // read till end of process:
+                      while (!feof(pipe)) {
+                        // use buffer to read and add to result
+                        if (fgets(buffer, 128, pipe) != NULL)
+                          result += buffer;
                       }
+                      auto ret = pclose(pipe);
+                      if (WIFEXITED(ret)) {
+                        if (WEXITSTATUS(ret) != 0) {
+                          std::cerr << "ERROR executing : " << command
+                                    << std::endl;
+                          std::cerr << result << std::endl;
+                        }
+                      }
+                    } else {
+                      std::cerr << "popen failed!";
                     }
-                  } else {
-                    std::cerr << "popen failed!";
-                  }
 
 #elif defined(Q_OS_WINDOWS)
-                  std::array<char, 128> buffer;
-                  std::string result;
-                  std::unique_ptr<FILE, decltype(&_pclose)> pipe(
-                      _popen(command.c_str(), "r"), _pclose);
-                  if (!pipe) {
-                    throw std::runtime_error("popen() failed!");
-                  }
-                  while (fgets(buffer.data(), buffer.size(), pipe.get()) !=
-                         nullptr) {
-                    result += buffer.data();
-                  }
+                    std::array<char, 128> buffer;
+                    std::string result;
+                    std::unique_ptr<FILE, decltype(&_pclose)> pipe(
+                        _popen(command.c_str(), "r"), _pclose);
+                    if (!pipe) {
+                      throw std::runtime_error("popen() failed!");
+                    }
+                    while (fgets(buffer.data(), buffer.size(), pipe.get()) !=
+                           nullptr) {
+                      result += buffer.data();
+                    }
 #else
-                  std::array<char, 128> buffer;
-                  std::string result;
-                  std::unique_ptr<FILE, decltype(&_pclose)> pipe(
-                      _popen(command.c_str(), "r"), _pclose);
-                  if (!pipe) {
-                    throw std::runtime_error("popen() failed!");
-                  }
-                  while (fgets(buffer.data(), buffer.size(), pipe.get()) !=
-                         nullptr) {
-                    result += buffer.data();
-                  }
-                  std::cerr << __FUNCTION__ << " Not implemented!" << std::endl;
+                    std::array<char, 128> buffer;
+                    std::string result;
+                    std::unique_ptr<FILE, decltype(&_pclose)> pipe(
+                        _popen(command.c_str(), "r"), _pclose);
+                    if (!pipe) {
+                      throw std::runtime_error("popen() failed!");
+                    }
+                    while (fgets(buffer.data(), buffer.size(), pipe.get()) !=
+                           nullptr) {
+                      result += buffer.data();
+                    }
+                    std::cerr << __FUNCTION__ << " Not implemented!"
+                              << std::endl;
 #endif
-                  std::filesystem::current_path(previousPath);
+                    std::filesystem::current_path(previousPath);
+                  }
                 }
               }
             }
@@ -309,13 +318,8 @@ bool StrideFramework::getPluginDetails(string &pluginName, int &majorVersion,
   return false;
 }
 
-std::string StrideFramework::getInherits() const { return m_inherits; }
-
-std::string StrideFramework::getInheritsVersion() const {
-  return m_inheritsVersion;
-}
-
-std::vector<string> StrideFramework::getInheritedList() const {
+std::vector<std::pair<std::string, std::string>>
+StrideFramework::getInheritedList() const {
   return m_inheritedList;
 }
 
@@ -361,9 +365,9 @@ StrideFramework::loadFrameworkRoot(std::string frameworkRoot) {
 }
 
 std::vector<std::string>
-StrideFramework::getInheritedFrameworkPaths(std::string frameworkRoot) {
+StrideFramework::getInheritedFrameworkPaths(std::string frameworkLibPath) {
   std::vector<std::string> inhPaths;
-  auto nodes = ASTFunctions::loadAllInDirectory(frameworkRoot);
+  auto nodes = ASTFunctions::loadAllInDirectory(frameworkLibPath);
   for (const auto &newNode : nodes) {
     if (newNode->getNodeType() == AST::Declaration) {
       auto decl = static_pointer_cast<DeclarationNode>(newNode);
@@ -389,22 +393,31 @@ StrideFramework::getInheritedFrameworkPaths(std::string frameworkRoot) {
   return inhPaths;
 }
 
-std::vector<string> StrideFramework::loadInheritedList(string frameworkRoot) {
-  std::vector<std::string> inh;
-  auto nodes = ASTFunctions::loadAllInDirectory(frameworkRoot);
-  for (const auto &newNode : nodes) {
-    if (newNode->getNodeType() == AST::Declaration) {
-      auto decl = static_pointer_cast<DeclarationNode>(newNode);
-      if (decl->getObjectType() == "_frameworkDescription") {
-        auto inheritsNode = decl->getPropertyValue("inherits");
-        auto inheritsVersionNode = decl->getPropertyValue("inheritsVersion");
-        if (inheritsNode && inheritsVersionNode &&
-            inheritsNode->getNodeType() == AST::String &&
-            inheritsVersionNode->getNodeType() == AST::String) {
-          // FIXME look for inheritance recursively
-          auto inheritsName =
-              static_pointer_cast<ValueNode>(inheritsNode)->getStringValue();
-          inh.push_back(inheritsName);
+std::vector<std::pair<std::string, std::string>>
+StrideFramework::loadInheritedList(string frameworkLibPath) {
+  std::vector<std::pair<std::string, std::string>> inh;
+
+  std::string frameworkPath = frameworkLibPath + "/Framework.stride";
+  if (auto root = AST::parseFile(frameworkPath.c_str())) {
+    for (const auto &node : root->getChildren()) {
+      if (node->getNodeType() == AST::Declaration) {
+        std::shared_ptr<DeclarationNode> nodeDeclaration =
+            std::static_pointer_cast<DeclarationNode>(node);
+        if (nodeDeclaration->getObjectType() == "_frameworkDescription") {
+          auto inheritsNode = nodeDeclaration->getPropertyValue("inherits");
+          auto inheritsVersionNode =
+              nodeDeclaration->getPropertyValue("inheritsVersion");
+          if (inheritsNode && inheritsVersionNode) {
+            if (inheritsNode->getNodeType() == AST::String &&
+                inheritsVersionNode->getNodeType() == AST::String) {
+              // FIXME look for inheritance recursively
+              inh.push_back(
+                  {std::static_pointer_cast<ValueNode>(inheritsNode)
+                       ->getStringValue(),
+                   std::static_pointer_cast<ValueNode>(inheritsVersionNode)
+                       ->getStringValue()});
+            }
+          }
         }
       }
     }

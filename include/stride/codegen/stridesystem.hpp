@@ -122,8 +122,7 @@ public:
   std::vector<std::shared_ptr<DeclarationNode>>
   getFrameworkOperators(std::string frameworkName);
 
-  std::vector<std::string>
-  getFrameworkAliasInherits(std::string frameworkAlias);
+  std::vector<std::pair<std::string, std::string> > getFrameworkAliasInherits(std::string frameworkAlias);
 
   std::string getDataType(ASTNode node, ASTNode tree);
 

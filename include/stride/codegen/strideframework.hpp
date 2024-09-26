@@ -37,6 +37,7 @@
 
 #include <map>
 #include <string>
+#include <utility>
 
 #include "stride/codegen/codevalidator.hpp"
 
@@ -56,8 +57,7 @@ public:
   StrideFramework(std::string strideRoot, std::string framework,
                   std::string fwVersion, std::string hardware = "",
                   std::string hardwareVersion = "",
-                  std::string rootNamespace = "", std::string inherits = "",
-                  std::string inheritsVersion = "");
+                  std::string rootNamespace = "");
 
   ~StrideFramework();
 
@@ -92,18 +92,16 @@ public:
   bool getPluginDetails(std::string &pluginName, int &majorVersion,
                         int &minorVersion);
 
-  std::string getInherits() const;
-  std::string getInheritsVersion() const;
-
-  std::vector<std::string> getInheritedList() const;
+  std::vector<std::pair<std::string, std::string>> getInheritedList() const;
 
 protected:
   std::vector<ASTNode> loadFrameworkRoot(std::string frameworkRoot);
 
   std::vector<std::string>
-  getInheritedFrameworkPaths(std::string frameworkRoot);
+  getInheritedFrameworkPaths(std::string frameworkLibPath);
 
-  std::vector<std::string> loadInheritedList(std::string frameworkRoot);
+  std::vector<std::pair<std::string, std::string>>
+  loadInheritedList(std::string frameworkLibPath);
 
 private:
   std::string m_strideRoot;
@@ -116,7 +114,7 @@ private:
   std::string m_inheritsVersion;
 
   std::vector<std::string> m_inheritedPaths;
-  std::vector<std::string> m_inheritedList;
+  std::vector<std::pair<std::string, std::string>> m_inheritedList;
 
   bool m_required;
   PlatformAPI m_api{
