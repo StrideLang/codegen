@@ -1,0 +1,53 @@
+type _SelfType {
+    typeName: "selfType"
+    properties: [
+		typeProperty {
+			name: "location"
+			types: [_IntLiteral]
+			default: none
+			required: on
+		}		
+        typeProperty {
+			name: "values"
+			types: [_IntLiteral]
+			default: none
+			required: on
+		}		
+        # typeProperty {
+		# 	name: "constrainedInt2"
+		# 	types: [
+        #         constrainedInt {
+        #             exclusiveMinimum: 2
+        #             exclusiveMaximum: 20
+        #         }
+        #     ]
+		# 	default: none
+		# 	required: on
+		# }	
+        # typeProperty {
+		# 	name: "constrainedIntMult"
+		# 	types: [
+        #         constrainedInt {
+        #             multipleOf: 4
+        #         }
+        #     ]
+		# 	default: 4
+		# 	required: off
+		# }
+    ]
+}
+
+selfType TypeTest[9] {
+    location: [0,1,2,3,4,5,6,7,8] # index into Sqaures
+    values: .location
+}
+
+# selfType TypeTest[9] {
+#     location: [0,1,2,3,4,5,6,7,8] # index into Sqaures
+#     streams: [
+#         .location >> IsLocationEmpty() >> LocationIsEmpty;
+#     ]
+#     values: [
+#         LocationIsEmpty
+#     ]
+# }

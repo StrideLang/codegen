@@ -70,6 +70,7 @@ private:
   void enableTesting();
   void declareModuleInternalBlocks();
   void resolveStreamSymbols();
+  void resolveDeclarationSymbols();
   void processDeclarations();
   void expandParallel();
   void resolveConstants();
@@ -171,6 +172,7 @@ private:
                                 ScopeStack scopeStack, ASTNode tree);
   void resolveTypeCastForDeclaration(std::shared_ptr<DeclarationNode> decl,
                                      ScopeStack scopeStack, ASTNode tree);
+  void resolveNodeSymbols(ASTNode decl, ScopeStack scopeStack, ASTNode tree);
 
   void appendParent(std::shared_ptr<DeclarationNode> decl,
                     std::shared_ptr<DeclarationNode> parent);

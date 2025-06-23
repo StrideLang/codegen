@@ -148,8 +148,8 @@ nullptr); EXPECT_TRUE(decl);
 
 TEST(Basic, BundleIndeces) {
   ASTNode tree;
-  tree = ASTFunctions::parseFile(TESTS_SOURCE_DIR
-                                 "basic/07_bundle_indeces.stride");
+  tree = AST::parseFile(TESTS_SOURCE_DIR
+                        "basic/07_bundle_indeces.stride");
   EXPECT_NE(tree, nullptr);
   std::vector<ASTNode> nodes = tree->getChildren();
   EXPECT_TRUE(nodes.size() == 23);

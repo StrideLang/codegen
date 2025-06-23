@@ -87,6 +87,7 @@ void CodeResolver::process() {
   m_system->injectResourceConfiguration(m_tree);
 
   // Resolve and massage tree
+  resolveDeclarationSymbols();
   expandParallel(); // Find better name this expands bundles, functions and
                     // declares undefined bundles
                     //    processResets();
@@ -2092,6 +2093,12 @@ void CodeResolver::resolveStreamSymbols() {
   }
 }
 
+void CodeResolver::resolveDeclarationSymbols() {
+  for (const auto &node : m_tree->getChildren()) {
+    resolveNodeSymbols(node, ScopeStack(), m_tree);
+  }
+}
+
 void CodeResolver::resolveConstants() {
   for (auto override = m_systemConfig.overrides["all"].cbegin();
        override != m_systemConfig.overrides["all"].cend(); ++override) {
@@ -2779,7 +2786,7 @@ ASTNode CodeResolver::resolvePortProperty(
   if (decl) {
     resolved = decl->getPropertyValue(portProperty->getName());
     if (resolved && resolved->getNodeType() == AST::PortProperty) {
-        // Resolve port property recursively
+      // Resolve port property recursively
       auto resolvedPortProperty =
           std::static_pointer_cast<PortPropertyNode>(resolved);
       if (decl->getName() !=
@@ -3706,6 +3713,35 @@ void CodeResolver::resolveTypeCastForDeclaration(
   if (streams) {
     for (const auto &node : streams->getChildren()) {
       resolveTypeCastForNode(node, scopeStack, tree);
+    }
+  }
+}
+
+void CodeResolver::resolveNodeSymbols(ASTNode node, ScopeStack scopeStack,
+                                      ASTNode tree) {
+  if (node->getNodeType() == AST::Declaration ||
+      node->getNodeType() == AST::BundleDeclaration) {
+    std::shared_ptr<DeclarationNode> decl =
+        std::static_pointer_cast<DeclarationNode>(node);
+    auto properties = decl->getProperties();
+    // Resolve ports
+    for (const auto &prop : properties) {
+      auto value = prop->getValue();
+      if (value->getNodeType() == AST::PortProperty) {
+        auto portProperty = std::static_pointer_cast<PortPropertyNode>(value);
+        if (portProperty->getName().empty()) {
+          // FIXME replacement should be done recursively
+          auto replacement =
+              decl->getPropertyValue(portProperty->getPortName());
+          if (replacement) {
+            decl->setPropertyValue(prop->getName(), replacement->deepCopy());
+          } else {
+            // invalid property
+            // TODO report error
+          }
+        } else { // not a "self" property
+        }
+      }
     }
   }
 }

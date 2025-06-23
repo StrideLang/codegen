@@ -18,6 +18,7 @@ endif()
 
 
 set(TEST_SOURCES main.cpp
+  resolver.cpp
   schema.cpp
   library.cpp
 )
