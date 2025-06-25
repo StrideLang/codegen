@@ -50,12 +50,17 @@ public:
   static int getNodeSize(ASTNode node, const ScopeStack &scopeStack,
                          ASTNode tree);
 
-  static int getBundleSize(std::shared_ptr<BundleNode> bundle, ScopeStack scope, ASTNode tree,
+  static int getBundleSize(std::shared_ptr<BundleNode> bundle, ScopeStack scope,
+                           ASTNode tree,
                            std::vector<LangError> *errors = nullptr);
 
   static int getBlockDeclaredSize(std::shared_ptr<DeclarationNode> block,
                                   ScopeStack scope, ASTNode tree,
                                   std::vector<LangError> *errors = nullptr);
+
+  static std::shared_ptr<DeclarationNode> synthesizeBundleDeclarationElement(
+      std::shared_ptr<DeclarationNode> bundleDeclaration, uint64_t index,
+      ScopeStack scope, ASTNode tree);
 
   static int
   getLargestPropertySize(std::vector<std::shared_ptr<PropertyNode>> &properties,

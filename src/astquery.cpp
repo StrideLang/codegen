@@ -389,6 +389,36 @@ int ASTQuery::getBlockDeclaredSize(std::shared_ptr<DeclarationNode> block,
   return size;
 }
 
+std::shared_ptr<DeclarationNode> ASTQuery::synthesizeBundleDeclarationElement(std::shared_ptr<DeclarationNode> bundleDeclaration, uint64_t index, ScopeStack scope, ASTNode tree) {
+    if (bundleDeclaration->getNodeType() != AST::BundleDeclaration) {
+        return nullptr;
+    }
+
+    std::shared_ptr<DeclarationNode> newDecl =
+        std::make_shared<DeclarationNode>(bundleDeclaration->getName(),
+                                          bundleDeclaration->getObjectType(),
+                                          nullptr, __FILE__, __LINE__);
+    for (const auto &prop : bundleDeclaration->getProperties()) {
+        auto value = prop->getValue();
+        // TODO support more complex scenarios, e.g. blocks that reference lists,
+        // bundle ranges, etc.
+        if (value->getNodeType() == AST::List) {
+            if (value->getChildren().size() > index) {
+                newDecl->setPropertyValue(prop->getName(),
+                                          value->getChildren()[index]->deepCopy());
+            } else {
+                // Invalid index
+                return nullptr;
+            }
+        } else {
+            newDecl->setPropertyValue(prop->getName(),
+                                      prop->getValue()->deepCopy());
+        }
+    }
+
+    return newDecl;
+}
+
 int ASTQuery::getLargestPropertySize(
     std::vector<std::shared_ptr<PropertyNode>> &properties, ScopeStack scope,
     ASTNode tree, std::vector<LangError> *errors) {

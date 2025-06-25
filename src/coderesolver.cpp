@@ -1461,7 +1461,7 @@ void CodeResolver::declareIfMissing(std::string name, ASTNode blocks,
   if (blocks->getNodeType() == AST::List) {
     ListNode *blockList = static_cast<ListNode *>(blocks.get());
     // First check if block has been declared
-    for (ASTNode block : blockList->getChildren()) {
+    for (const ASTNode &block : blockList->getChildren()) {
       if (block->getNodeType() == AST::Declaration ||
           block->getNodeType() == AST::BundleDeclaration) {
         std::shared_ptr<DeclarationNode> declaredBlock =
