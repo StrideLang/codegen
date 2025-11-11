@@ -62,6 +62,10 @@ public:
   static void resolveConstantsInNode(ASTNode node, ScopeStack scope,
                                      ASTNode tree);
 
+  static ASTNode
+  resolvePortPropertiesForDecl(std::shared_ptr<DeclarationNode> decl,
+                               ScopeStack scopeStack, ASTNode tree);
+
   // Reduce 'value' to a single constant ValueNode if possible
   static std::shared_ptr<ValueNode> resolveConstant(ASTNode value,
                                                     ScopeStack scope,

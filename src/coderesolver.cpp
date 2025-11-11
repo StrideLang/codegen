@@ -109,6 +109,7 @@ void CodeResolver::process() {
   m_system->injectResourceConfiguration(m_tree);
 
   resolveConstants();
+  resolvePortProperties();
   //  printTree();
 
   processDeclarations();
@@ -2131,6 +2132,12 @@ void CodeResolver::resolveConstants() {
   }
   for (const ASTNode &node : m_tree->getChildren()) {
     ASTFunctions::resolveConstantsInNode(node, {}, m_tree);
+  }
+}
+
+void CodeResolver::resolvePortProperties() {
+  for (const auto &node : m_tree->getChildren()) {
+    resolveNodeSymbols(node, ScopeStack(), m_tree);
   }
 }
 

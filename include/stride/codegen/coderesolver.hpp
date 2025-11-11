@@ -74,6 +74,7 @@ private:
   void processDeclarations();
   void expandParallel();
   void resolveConstants();
+  void resolvePortProperties();
   void processDomains();
   void resolveRates();
   void analyzeConnections();

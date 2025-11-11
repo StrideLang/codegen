@@ -645,13 +645,16 @@ void ASTFunctions::resolveConstantsInNode(ASTNode node, ScopeStack scope,
         property->replaceValue(newValue);
       }
     }
-  } else if (node->getNodeType() == AST::Declaration) {
+  } else if (node->getNodeType() == AST::Declaration ||
+             node->getNodeType() == AST::BundleDeclaration) {
     std::shared_ptr<DeclarationNode> decl =
         std::static_pointer_cast<DeclarationNode>(node);
     std::vector<std::shared_ptr<PropertyNode>> properties =
         decl->getProperties();
     std::shared_ptr<ListNode> internalBlocks =
         std::static_pointer_cast<ListNode>(decl->getPropertyValue("blocks"));
+    // TODO check for inheriting from _CodeGenerator instead of explicitly
+    // testing for object type
     if ((decl->getObjectType() == "module" ||
          decl->getObjectType() == "reaction" ||
          decl->getObjectType() == "loop") &&
@@ -682,55 +685,106 @@ void ASTFunctions::resolveConstantsInNode(ASTNode node, ScopeStack scope,
     //    }
 
     for (std::shared_ptr<PropertyNode> property : properties) {
-      resolveConstantsInNode(property->getValue(), scope, tree);
-      std::shared_ptr<ValueNode> newValue =
-          resolveConstant(property->getValue(), scope, tree, frameworkName);
-      if (!newValue) {
-        // try to resolve on global namespace
-        newValue =
-            ASTFunctions::resolveConstant(property->getValue(), scope, tree);
-      }
-      if (newValue) {
-        property->replaceValue(newValue);
-      }
-    }
-    //    }
-  } else if (node->getNodeType() == AST::BundleDeclaration) {
-    std::shared_ptr<DeclarationNode> decl =
-        std::static_pointer_cast<DeclarationNode>(node);
-    std::vector<std::shared_ptr<PropertyNode>> properties =
-        decl->getProperties();
-    std::shared_ptr<ListNode> internalBlocks =
-        std::static_pointer_cast<ListNode>(decl->getPropertyValue("blocks"));
-    if (internalBlocks) {
-      if (internalBlocks->getNodeType() == AST::List) {
-        auto blocks = internalBlocks->getChildren();
-        scope.push_back({node, blocks});
+      // FIXME verify that decl inherits from _CodeGenerator
+      if (property->getName() == "streams" &&
+          decl->getNodeType() == AST::BundleDeclaration) {
+        size_t bundleSize = 0;
+        auto bundle = decl->getBundle();
+        std::vector<ASTNode> listExprs =
+            decl->getBundle()->getChildren()[0]->getChildren();
+        for (const ASTNode &expr : listExprs) {
+          if (expr->getNodeType() == AST::Int) {
+            bundleSize =
+                std::static_pointer_cast<ValueNode>(expr)->getIntValue();
+          }
+        }
+        auto newStreams = std::make_shared<ListNode>(__FILE__, __LINE__);
+        auto value = property->getValue();
+        if (value->getNodeType() == AST::List) {
+          for (const auto &streamNode : value->getChildren()) {
+            if (streamNode->getNodeType() == AST::Stream) {
+              auto stream = std::static_pointer_cast<StreamNode>(streamNode);
+              for (int i = 0; i < bundleSize; i++) {
+                auto newStreamList =
+                    std::make_shared<ListNode>(__FILE__, __LINE__);
+                StreamNodeIterator it(stream);
+                StreamNodeBuilder builder;
+                auto node = it.next();
+                while (node) {
+                  if (node->getNodeType() == AST::PortProperty) {
+                    auto pp = std::static_pointer_cast<PortPropertyNode>(node);
+                    if (pp->getName() == "") {
+                      auto pv = decl->getPropertyValue(pp->getPortName());
+                      if (pv) {
+                        if (pv->getNodeType() == AST::List) {
+                          auto listElems = pv->getChildren();
+                          if (listElems.size() >= bundleSize) {
+                            builder.addNode(listElems[i]);
+                          } else {
+                            // This should be caught by validation sooner, but
+                            // fail graciously here
+                            builder.addNode(pv);
+                          }
+                        } else {
+                          builder.addNode(pv);
+                        }
+                      } else {
+                        std::cerr << "Port property not existent for expansion."
+                                  << std::endl;
+                      }
+                    } else {
+                      std::cerr << "Substition in streams for port properties "
+                                   "in bundle declarations only supported for "
+                                   "internal ports."
+                                << std::endl;
+                      builder.addNode(node);
+                    }
+                  } else {
+                    builder.addNode(node);
+                  }
+                  node = it.next();
+                }
+                newStreamList->addChild(builder.build());
+                newStreams->addChild(newStreamList);
+              }
+            } else {
+              std::cerr << "unexpected node type when processing stream node: "
+                        << AST::toText(value) << std::endl;
+              newStreams->addChild(value);
+            }
+          }
+          property->replaceValue(newStreams);
+        } else if (value->getNodeType() == AST::Stream) {
+
+          //   if ()
+          // for (int i = 0; i < bundleSize; i++) {
+          //       builder.addNode();
+          // }
+        } else {
+          std::cerr << "unexpected node type when processing stream node: "
+                    << AST::toText(value) << std::endl;
+          newStreams->addChild(value);
+        }
+
+      } else {
+        resolveConstantsInNode(property->getValue(), scope, tree);
+        std::shared_ptr<ValueNode> newValue =
+            resolveConstant(property->getValue(), scope, tree, frameworkName);
+        if (!newValue) {
+          // try to resolve on global namespace
+          newValue =
+              ASTFunctions::resolveConstant(property->getValue(), scope, tree);
+        }
+        if (newValue) {
+          property->replaceValue(newValue);
+        }
       }
     }
 
-    auto frameworkNode = node->getCompilerProperty("framework");
-    std::string frameworkName;
-    if (frameworkNode) {
-      frameworkName =
-          std::static_pointer_cast<ValueNode>(frameworkNode)->getStringValue();
+    if (decl->getNodeType() == AST::BundleDeclaration) {
+      std::shared_ptr<BundleNode> bundle = decl->getBundle();
+      resolveConstantsInNode(bundle->index(), scope, tree);
     }
-
-    for (std::shared_ptr<PropertyNode> property : properties) {
-      resolveConstantsInNode(property->getValue(), scope, tree);
-      std::shared_ptr<ValueNode> newValue = ASTFunctions::resolveConstant(
-          property->getValue(), scope, tree, frameworkName);
-      if (!newValue) {
-        // try to resolve on global namespace
-        newValue = ASTFunctions::resolveConstant(property->getValue(), scope,
-                                                 tree, frameworkName);
-      }
-      if (newValue) {
-        property->replaceValue(newValue);
-      }
-    }
-    std::shared_ptr<BundleNode> bundle = decl->getBundle();
-    resolveConstantsInNode(bundle->index(), scope, tree);
   } else if (node->getNodeType() == AST::Expression) {
     std::shared_ptr<ExpressionNode> expr =
         std::static_pointer_cast<ExpressionNode>(node);
@@ -794,6 +848,22 @@ void ASTFunctions::resolveConstantsInNode(ASTNode node, ScopeStack scope,
     std::shared_ptr<ListNode> index = bundle->index();
     resolveConstantsInNode(index, scope, tree);
   }
+}
+
+ASTNode ASTFunctions::resolvePortPropertiesForDecl(
+    std::shared_ptr<DeclarationNode> decl, ScopeStack scopeStack,
+    ASTNode tree) {
+  ASTNode out;
+  for (const auto &prop : decl->getProperties()) {
+    auto propValue = prop->getValue();
+    // TODO verify that decl inherits from _CodeGeneration
+    if (prop->getName() == "streams") {
+      if (propValue->getNodeType() == AST::List) {
+        // for()
+      }
+    }
+  }
+  return out;
 }
 
 std::shared_ptr<ValueNode>
