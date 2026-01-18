@@ -11,6 +11,7 @@
 //#include "stride/parser/functionnode.h"
 #include "stride/parser/portpropertynode.h"
 
+namespace strd {
 typedef enum {
   ACCESS_NONE = 0,
   ACCESS_SDR = 1 << 1,   // Single Domain Read
@@ -308,5 +309,6 @@ public:
     (*this)[domainId].prepend(code);
   }
 };
+} // namespace strd
 
 #endif // CODEENTITIES_HPP

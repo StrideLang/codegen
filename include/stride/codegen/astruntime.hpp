@@ -6,6 +6,7 @@
 #include "stride/parser/functionnode.h"
 #include "stride/parser/valuenode.h"
 
+namespace strd {
 struct StrideRuntimeStatus {
   bool ok;
   LangError err;
@@ -72,5 +73,6 @@ private:
   static void nodeIsNone(ASTNode &node1, ASTNode &output,
                          StrideRuntimeStatus &status);
 };
+} // namespace strd
 
 #endif // ASTRUNTIME_H

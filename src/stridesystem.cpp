@@ -54,6 +54,8 @@
 #include "stride/parser/propertynode.h"
 //#include "pythonproject.h"
 
+using namespace strd;
+
 StrideSystem::StrideSystem(std::string strideRoot, std::string systemName,
                            int majorVersion, int minorVersion,
                            std::vector<std::shared_ptr<ImportNode>> importList)

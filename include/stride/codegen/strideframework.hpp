@@ -45,6 +45,7 @@
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/valuenode.h"
 
+namespace strd {
 struct FrameworkTree {
   std::string importName;
   std::string importAs;
@@ -124,5 +125,6 @@ private:
 
   std::vector<FrameworkTree> m_trees;
 };
+} // namespace strd
 
 #endif // STREAMPLATFORM_H

@@ -9,6 +9,7 @@
 #include <string>
 #include <variant>
 
+namespace strd {
 using ConfigMap =
     std::map<std::string, std::variant<int64_t, double, std::string>>;
 
@@ -29,5 +30,6 @@ public:
   void readConfiguration(std::string filename);
   void writeConfiguration(std::string filename);
 };
+} // namespace strd
 
 #endif // SYSTEMCONFIGURATION_HPP

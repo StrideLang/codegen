@@ -41,6 +41,7 @@
 #include "stride/parser/declarationnode.h"
 //#include "langerror.h"
 
+namespace strd {
 struct LibraryTree {
   std::string importName;
   std::string importAs;
@@ -80,5 +81,6 @@ private:
   int m_minorVersion;
   std::vector<std::string> m_includePaths;
 };
+} // namespace strd
 
 #endif // STRIDELIBRARY_HPP

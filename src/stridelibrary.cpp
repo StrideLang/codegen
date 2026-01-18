@@ -33,13 +33,15 @@
 */
 
 #include "stride/codegen/stridelibrary.hpp"
-#include "stride/parser/ast.h"
 #include "stride/codegen/astfunctions.hpp"
 #include "stride/codegen/astquery.hpp"
+#include "stride/parser/ast.h"
 #include "stride/parser/valuenode.h"
 
 #include <cassert>
 #include <filesystem>
+
+using namespace strd;
 
 StrideLibrary::StrideLibrary() : m_majorVersion(1), m_minorVersion(0) {}
 

@@ -46,6 +46,7 @@
 #include "stride/parser/valuenode.h"
 
 using namespace std;
+using namespace strd;
 
 StrideFramework::StrideFramework(std::string strideRoot, std::string framework,
                                  std::string fwVersion, std::string hardware,

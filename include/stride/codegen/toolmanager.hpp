@@ -7,6 +7,7 @@
 
 #include "stride/parser/ast.h"
 
+namespace strd {
 struct ToolTemplate {
   std::string strideName;
   std::string displayName;
@@ -56,5 +57,6 @@ public:
 private:
   std::string m_strideRoot;
 };
+} // namespace strd
 
 #endif // TOOLMANAGER_HPP

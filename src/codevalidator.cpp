@@ -46,6 +46,8 @@
 #include <memory>
 #include <sstream>
 
+using namespace strd;
+
 CodeValidator::CodeValidator(ASTNode tree, Options options)
     : m_system(nullptr), m_tree(tree), m_options(options) {
   validateTree(tree);

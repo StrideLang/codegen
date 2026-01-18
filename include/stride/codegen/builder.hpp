@@ -42,6 +42,7 @@
 
 #define STRIDE_PLUGIN_MAX_STR_LEN 32
 
+namespace strd {
 class Builder;
 
 typedef Builder *(*create_object_t)(std::string projectDir,
@@ -122,5 +123,6 @@ inline std::string Builder::substituteTokens(std::string text) {
   }
   return text;
 }
+} // namespace strd
 
 #endif // BASEPROJECT_H

@@ -16,6 +16,8 @@
 #include <iostream>
 #include <vector>
 
+using namespace strd;
+
 std::string ASTFunctions::getDefaultStrideRoot() {
   auto strideroot = getenv("STRIDEROOT");
   if (strideroot) {

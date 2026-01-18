@@ -7,6 +7,7 @@
 
 #include <functional>
 
+namespace strd {
 class ASTValidation {
 public:
   ASTValidation();
@@ -103,5 +104,6 @@ protected:
       ASTNode tree = nullptr, std::vector<std::string> parentNamespace = {},
       std::string currentFramework = "");
 };
+} // namespace strd
 
 #endif // ASTVALIDATION_H

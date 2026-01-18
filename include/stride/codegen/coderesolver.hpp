@@ -49,6 +49,7 @@
 
 #include "systemconfiguration.hpp"
 
+namespace strd {
 // Resolves all code and creates a StrideSystem
 class CodeResolver {
 public:
@@ -193,5 +194,6 @@ private:
 
   ASTNode m_tree;
 };
+} // namespace strd
 
 #endif // CODERESOLVER_H

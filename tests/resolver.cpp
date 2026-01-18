@@ -5,6 +5,8 @@
 #include "stride/codegen/coderesolver.hpp"
 // #include "stride/codegen/stridelibrary.hpp"
 
+using namespace strd;
+
 TEST(Resolver, SelfPort) {
   auto strideroot = ASTFunctions::getDefaultStrideRoot();
   ASTNode tree;

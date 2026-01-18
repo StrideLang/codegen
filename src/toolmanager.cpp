@@ -10,6 +10,8 @@
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/valuenode.h"
 
+using namespace strd;
+
 ToolManager::ToolManager(std::string strideRoot) {
   setStrideRoot(strideRoot);
   readTemplates();

@@ -44,6 +44,8 @@
 #include <cassert>
 #include <iostream>
 
+using namespace strd;
+
 CodeResolver::CodeResolver(ASTNode tree, std::string striderootDir,
                            SystemConfiguration systemConfig)
     : m_systemConfig(systemConfig), m_tree(tree) {

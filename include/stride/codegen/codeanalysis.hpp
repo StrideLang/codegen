@@ -4,6 +4,7 @@
 #include "stride/parser/strideparser.h"
 #include "stridesystem.hpp"
 
+namespace strd {
 class CodeAnalysis {
 public:
   enum { SIZE_UNKNOWN = -1, SIZE_PORT_PROPERTY = -2 };
@@ -131,5 +132,6 @@ public:
   getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
                             ASTNode tree);
 };
+} // namespace strd
 
 #endif // CODEANALYSIS_HPP

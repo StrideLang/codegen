@@ -3,6 +3,8 @@
 
 #include <iostream>
 
+using namespace strd;
+
 std::string LanguageSyntax::getDeclarationType(std::string type,
                                                std::string name,
                                                SignalAccess access,

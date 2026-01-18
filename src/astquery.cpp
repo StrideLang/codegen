@@ -8,6 +8,8 @@
 #include <iterator>
 #include <sstream>
 
+using namespace strd;
+
 std::vector<std::shared_ptr<SystemNode>>
 ASTQuery::getSystemNodes(ASTNode tree) {
   //  Q_ASSERT(m_tree);
@@ -389,34 +391,34 @@ int ASTQuery::getBlockDeclaredSize(std::shared_ptr<DeclarationNode> block,
   return size;
 }
 
-std::shared_ptr<DeclarationNode> ASTQuery::synthesizeBundleDeclarationElement(std::shared_ptr<DeclarationNode> bundleDeclaration, uint64_t index, ScopeStack scope, ASTNode tree) {
-    if (bundleDeclaration->getNodeType() != AST::BundleDeclaration) {
+std::shared_ptr<DeclarationNode> ASTQuery::synthesizeBundleDeclarationElement(
+    std::shared_ptr<DeclarationNode> bundleDeclaration, uint64_t index,
+    ScopeStack scope, ASTNode tree) {
+  if (bundleDeclaration->getNodeType() != AST::BundleDeclaration) {
+    return nullptr;
+  }
+
+  std::shared_ptr<DeclarationNode> newDecl = std::make_shared<DeclarationNode>(
+      bundleDeclaration->getName(), bundleDeclaration->getObjectType(), nullptr,
+      __FILE__, __LINE__);
+  for (const auto &prop : bundleDeclaration->getProperties()) {
+    auto value = prop->getValue();
+    // TODO support more complex scenarios, e.g. blocks that reference lists,
+    // bundle ranges, etc.
+    if (value->getNodeType() == AST::List) {
+      if (value->getChildren().size() > index) {
+        newDecl->setPropertyValue(prop->getName(),
+                                  value->getChildren()[index]->deepCopy());
+      } else {
+        // Invalid index
         return nullptr;
+      }
+    } else {
+      newDecl->setPropertyValue(prop->getName(), prop->getValue()->deepCopy());
     }
+  }
 
-    std::shared_ptr<DeclarationNode> newDecl =
-        std::make_shared<DeclarationNode>(bundleDeclaration->getName(),
-                                          bundleDeclaration->getObjectType(),
-                                          nullptr, __FILE__, __LINE__);
-    for (const auto &prop : bundleDeclaration->getProperties()) {
-        auto value = prop->getValue();
-        // TODO support more complex scenarios, e.g. blocks that reference lists,
-        // bundle ranges, etc.
-        if (value->getNodeType() == AST::List) {
-            if (value->getChildren().size() > index) {
-                newDecl->setPropertyValue(prop->getName(),
-                                          value->getChildren()[index]->deepCopy());
-            } else {
-                // Invalid index
-                return nullptr;
-            }
-        } else {
-            newDecl->setPropertyValue(prop->getName(),
-                                      prop->getValue()->deepCopy());
-        }
-    }
-
-    return newDecl;
+  return newDecl;
 }
 
 int ASTQuery::getLargestPropertySize(

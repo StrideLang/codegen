@@ -4,6 +4,8 @@
 #include "stride/codegen/astquery.hpp"
 #include "stride/codegen/stridelibrary.hpp"
 
+using namespace strd;
+
 TEST(Library, ImportRaw) {
   StrideLibrary library;
 
@@ -26,8 +28,7 @@ TEST(Library, ImportRaw) {
 
 TEST(Library, Import) {
 
-  auto tree =
-      AST::parseFile(TESTS_SOURCE_DIR "library/01_import.stride");
+  auto tree = AST::parseFile(TESTS_SOURCE_DIR "library/01_import.stride");
 
   ASTFunctions::preprocess(tree);
 

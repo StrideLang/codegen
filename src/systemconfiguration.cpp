@@ -4,6 +4,8 @@
 #include <fstream>
 #include <iostream>
 
+using namespace strd;
+
 SystemConfiguration::SystemConfiguration() {
   //  resourceConfigurations["all"] = ConfigMap();
 }

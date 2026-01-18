@@ -3,6 +3,8 @@
 #include <cassert>
 #include <iostream>
 
+using namespace strd;
+
 ASTRuntime::ASTRuntime() {}
 
 std::shared_ptr<ValueNode>

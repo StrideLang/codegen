@@ -37,6 +37,7 @@
 
 #include "stride/parser/strideparser.h"
 
+namespace strd {
 class StrideSystem;
 
 typedef std::vector<std::pair<ASTNode, std::vector<ASTNode>>> ScopeStack;
@@ -108,5 +109,6 @@ private:
   std::vector<LangError> m_errors;
   Options m_options;
 };
+} // namespace strd
 
 #endif // CODEGEN_H

@@ -5,6 +5,7 @@
 
 #include <string>
 
+namespace strd {
 class CodeQuery {
 public:
   // Resolve types
@@ -25,5 +26,6 @@ public:
                                                  ScopeStack scopeStack,
                                                  ASTNode tree);
 };
+} // namespace strd
 
 #endif // CODEQUERY_HPP

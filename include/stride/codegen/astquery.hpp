@@ -5,6 +5,7 @@
 
 #include <vector>
 
+namespace strd {
 typedef std::vector<std::pair<ASTNode, std::vector<ASTNode>>> ScopeStack;
 
 class ASTQuery {
@@ -128,5 +129,6 @@ private:
                              std::shared_ptr<DeclarationNode> decl,
                              std::string currentFramework = "");
 };
+} // namespace strd
 
 #endif // ASTQUERY_H

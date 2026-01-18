@@ -14,6 +14,8 @@
 //#include "stride/parser/rangenode.h"
 //#include "stride/parser/valuenode.h"
 
+using namespace strd;
+
 TEST(Schema, ObjectTypes) {
   auto strideroot = ASTFunctions::getDefaultStrideRoot();
   ASTNode tree;

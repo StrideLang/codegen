@@ -10,6 +10,7 @@
 #include <map>
 #include <vector>
 
+namespace strd {
 class ASTFunctions {
 public:
   static std::string getDefaultStrideRoot();
@@ -106,5 +107,6 @@ protected:
   static std::vector<std::shared_ptr<DeclarationNode>>
   extractStreamDeclarations(std::shared_ptr<StreamNode> stream);
 };
+} // namespace strd
 
 #endif // ASTFUNCTIONS_H

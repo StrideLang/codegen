@@ -8,6 +8,7 @@
 #include "stride/parser/valuenode.h"
 #include "stridesystem.hpp"
 
+namespace strd {
 class LanguageSyntax {
 public:
   static std::string endStatement() { return ";\n"; }
@@ -106,5 +107,6 @@ public:
   static std::string getDataType(std::shared_ptr<DeclarationNode> decl,
                                  StrideSystem *system);
 };
+} // namespace strd
 
 #endif // LANGUAGESYNTAX_HPP

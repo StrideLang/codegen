@@ -7,6 +7,8 @@
 #include <iostream>
 #include <unordered_set>
 
+using namespace strd;
+
 ASTValidation::ASTValidation() {}
 
 std::vector<LangError> ASTValidation::validate(ASTNode tree) {

@@ -6,6 +6,8 @@
 #include <cassert>
 #include <iostream>
 
+using namespace strd;
+
 std::vector<std::string> CodeAnalysis::getUsedDomains(ASTNode tree) {
   std::vector<std::string> domains;
   for (const ASTNode &node : tree->getChildren()) {
