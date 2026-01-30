@@ -655,11 +655,9 @@ void ASTFunctions::resolveConstantsInNode(ASTNode node, ScopeStack scope,
         decl->getProperties();
     std::shared_ptr<ListNode> internalBlocks =
         std::static_pointer_cast<ListNode>(decl->getPropertyValue("blocks"));
-    // TODO check for inheriting from _CodeGenerator instead of explicitly
-    // testing for object type
-    if ((decl->getObjectType() == "module" ||
-         decl->getObjectType() == "reaction" ||
-         decl->getObjectType() == "loop") &&
+    // TODO namespaces
+    if (ASTQuery::isCodeGenerator(
+            ASTQuery::findDeclarationByName(decl->getName(), scope, tree)) &&
         internalBlocks) {
       if (internalBlocks->getNodeType() == AST::List) {
         auto blocks = internalBlocks->getChildren();

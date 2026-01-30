@@ -124,6 +124,8 @@ public:
   findPropertyByName(std::vector<std::shared_ptr<PropertyNode>> properties,
                      std::string propertyName);
 
+  static bool isCodeGenerator(std::shared_ptr<DeclarationNode> typeDecl);
+
 private:
   static bool namespaceMatch(std::vector<std::string> scopeList,
                              std::shared_ptr<DeclarationNode> decl,

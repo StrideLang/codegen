@@ -829,6 +829,26 @@ std::shared_ptr<PropertyNode> ASTQuery::findPropertyByName(
   return nullptr;
 }
 
+bool ASTQuery::isCodeGenerator(std::shared_ptr<DeclarationNode> typeDecl)
+{
+    bool isCodeGenerator = false;
+    if (typeDecl) {
+        // FIXME: More robust search to include recursive and indirect inheritance
+        auto inheritsProp = typeDecl->getPropertyValue("inherits");
+        if (inheritsProp) {
+            for (const auto &inheritsNode : inheritsProp->getChildren()) {
+                if (inheritsNode && inheritsNode->getNodeType() == AST::Block &&
+                    std::static_pointer_cast<BlockNode>(inheritsNode)->getName() ==
+                        "_CodeGenerator") {
+                    isCodeGenerator = true;
+                    break;
+                }
+            }
+        }
+    }
+    return isCodeGenerator;
+}
+
 bool ASTQuery::namespaceMatch(std::vector<std::string> scopeList,
                               std::shared_ptr<DeclarationNode> decl,
                               std::string currentFramework) {
