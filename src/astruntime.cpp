@@ -148,31 +148,31 @@ void ASTRuntime::nodesAreEqual(ASTNode &node1, ASTNode &node2, ASTNode &output,
   assert(output->getNodeType() == AST::Switch);
   auto outSwitch = std::static_pointer_cast<ValueNode>(output);
   if (node1->getNodeType() == AST::Int && node2->getNodeType() == AST::Int) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getIntValue() ==
-        std::static_pointer_cast<ValueNode>(node2)->getIntValue();
+        std::static_pointer_cast<ValueNode>(node2)->getIntValue());
   } else if (node1->getNodeType() == AST::Real &&
              node2->getNodeType() == AST::Real) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getRealValue() ==
-        std::static_pointer_cast<ValueNode>(node2)->getRealValue();
+        std::static_pointer_cast<ValueNode>(node2)->getRealValue());
   } else if (node1->getNodeType() == AST::Real &&
              node2->getNodeType() == AST::Int) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getRealValue() ==
-        std::static_pointer_cast<ValueNode>(node2)->getIntValue();
+        std::static_pointer_cast<ValueNode>(node2)->getIntValue());
   } else if (node1->getNodeType() == AST::Int &&
              node2->getNodeType() == AST::Real) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getIntValue() ==
-        std::static_pointer_cast<ValueNode>(node2)->getRealValue();
+        std::static_pointer_cast<ValueNode>(node2)->getRealValue());
   } else if (node1->getNodeType() == AST::Switch &&
              node2->getNodeType() == AST::Switch) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getSwitchValue() ==
-        std::static_pointer_cast<ValueNode>(node2)->getSwitchValue();
+        std::static_pointer_cast<ValueNode>(node2)->getSwitchValue());
   } else {
-    outSwitch->m_switch = false;
+    outSwitch->setBoolValue(false);
     status.ok = false;
     return;
   }
@@ -186,7 +186,7 @@ void ASTRuntime::nodesAreNotEqual(ASTNode &node1, ASTNode &node2,
   if (status.ok) {
     assert(output->getNodeType() == AST::Switch);
     auto outputSwitch = std::static_pointer_cast<ValueNode>(output);
-    outputSwitch->m_switch = !outputSwitch->m_switch;
+    outputSwitch->setBoolValue(!outputSwitch->getSwitchValue());
   }
 }
 
@@ -195,24 +195,24 @@ void ASTRuntime::nodesIsGreater(ASTNode &node1, ASTNode &node2, ASTNode &output,
   assert(output->getNodeType() == AST::Switch);
   auto outSwitch = std::static_pointer_cast<ValueNode>(output);
   if (node1->getNodeType() == AST::Int && node2->getNodeType() == AST::Int) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getIntValue() >
-        std::static_pointer_cast<ValueNode>(node2)->getIntValue();
+        std::static_pointer_cast<ValueNode>(node2)->getIntValue());
   } else if (node1->getNodeType() == AST::Real &&
              node2->getNodeType() == AST::Real) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getRealValue() >
-        std::static_pointer_cast<ValueNode>(node2)->getRealValue();
+        std::static_pointer_cast<ValueNode>(node2)->getRealValue());
   } else if (node1->getNodeType() == AST::Real &&
              node2->getNodeType() == AST::Int) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getRealValue() >
-        std::static_pointer_cast<ValueNode>(node2)->getIntValue();
+        std::static_pointer_cast<ValueNode>(node2)->getIntValue());
   } else if (node1->getNodeType() == AST::Int &&
              node2->getNodeType() == AST::Real) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getIntValue() >
-        std::static_pointer_cast<ValueNode>(node2)->getRealValue();
+        std::static_pointer_cast<ValueNode>(node2)->getRealValue());
   } else {
     status.ok = false;
     return;
@@ -227,7 +227,7 @@ void ASTRuntime::nodesIsNotGreater(ASTNode &node1, ASTNode &node2,
   if (status.ok) {
     assert(output->getNodeType() == AST::Switch);
     auto outputSwitch = std::static_pointer_cast<ValueNode>(output);
-    outputSwitch->m_switch = !outputSwitch->m_switch;
+    outputSwitch->setBoolValue(!outputSwitch->getSwitchValue());
   }
 }
 
@@ -236,24 +236,24 @@ void ASTRuntime::nodesIsLesser(ASTNode &node1, ASTNode &node2, ASTNode &output,
   assert(output->getNodeType() == AST::Switch);
   auto outSwitch = std::static_pointer_cast<ValueNode>(output);
   if (node1->getNodeType() == AST::Int && node2->getNodeType() == AST::Int) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getIntValue() <
-        std::static_pointer_cast<ValueNode>(node2)->getIntValue();
+        std::static_pointer_cast<ValueNode>(node2)->getIntValue());
   } else if (node1->getNodeType() == AST::Real &&
              node2->getNodeType() == AST::Real) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getRealValue() <
-        std::static_pointer_cast<ValueNode>(node2)->getRealValue();
+        std::static_pointer_cast<ValueNode>(node2)->getRealValue());
   } else if (node1->getNodeType() == AST::Real &&
              node2->getNodeType() == AST::Int) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getRealValue() <
-        std::static_pointer_cast<ValueNode>(node2)->getIntValue();
+        std::static_pointer_cast<ValueNode>(node2)->getIntValue());
   } else if (node1->getNodeType() == AST::Int &&
              node2->getNodeType() == AST::Real) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getIntValue() <
-        std::static_pointer_cast<ValueNode>(node2)->getRealValue();
+        std::static_pointer_cast<ValueNode>(node2)->getRealValue());
   } else {
     status.ok = false;
     return;
@@ -268,7 +268,7 @@ void ASTRuntime::nodesIsNotLesser(ASTNode &node1, ASTNode &node2,
   if (status.ok) {
     assert(output->getNodeType() == AST::Switch);
     auto outputSwitch = std::static_pointer_cast<ValueNode>(output);
-    outputSwitch->m_switch = !outputSwitch->m_switch;
+    outputSwitch->setBoolValue(!outputSwitch->getSwitchValue());
   }
 }
 
@@ -278,9 +278,9 @@ void ASTRuntime::nodesOr(ASTNode &node1, ASTNode &node2, ASTNode &output,
   auto outSwitch = std::static_pointer_cast<ValueNode>(output);
   if (node1->getNodeType() == AST::Switch &&
       node2->getNodeType() == AST::Switch) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getSwitchValue() ||
-        std::static_pointer_cast<ValueNode>(node2)->getSwitchValue();
+        std::static_pointer_cast<ValueNode>(node2)->getSwitchValue());
     status.ok = true;
   }
   status.ok = false;
@@ -292,9 +292,9 @@ void ASTRuntime::nodesAnd(ASTNode &node1, ASTNode &node2, ASTNode &output,
   auto outSwitch = std::static_pointer_cast<ValueNode>(output);
   if (node1->getNodeType() == AST::Switch &&
       node2->getNodeType() == AST::Switch) {
-    outSwitch->m_switch =
+    outSwitch->setBoolValue(
         std::static_pointer_cast<ValueNode>(node1)->getSwitchValue() &&
-        std::static_pointer_cast<ValueNode>(node2)->getSwitchValue();
+        std::static_pointer_cast<ValueNode>(node2)->getSwitchValue());
     status.ok = true;
   }
   status.ok = false;
@@ -305,8 +305,8 @@ void ASTRuntime::nodeNot(ASTNode &node1, ASTNode &output,
   assert(output->getNodeType() == AST::Switch);
   auto outSwitch = std::static_pointer_cast<ValueNode>(output);
   if (node1->getNodeType() == AST::Switch) {
-    outSwitch->m_switch =
-        !std::static_pointer_cast<ValueNode>(node1)->getSwitchValue();
+    outSwitch->setBoolValue(
+        !std::static_pointer_cast<ValueNode>(node1)->getSwitchValue());
     status.ok = true;
   }
   status.ok = false;
@@ -316,7 +316,7 @@ void ASTRuntime::nodeIsNone(ASTNode &node1, ASTNode &output,
                             StrideRuntimeStatus &status) {
   assert(output->getNodeType() == AST::Switch);
   auto outSwitch = std::static_pointer_cast<ValueNode>(output);
-  outSwitch->m_switch = node1->getNodeType() == AST::None;
+  outSwitch->setBoolValue(node1->getNodeType() == AST::None);
   status.ok = true;
 }
 
@@ -352,9 +352,9 @@ void ASTRuntime::resolveFunction(
       if (status.ok) {
         nodesAreEqual(input[0], input[1], output[0], status);
       }
-      std::static_pointer_cast<ValueNode>(output[0])->m_switch =
+      std::static_pointer_cast<ValueNode>(output[0])->setBoolValue(
           std::static_pointer_cast<ValueNode>(output[0])->getSwitchValue() ||
-          greater;
+          greater);
     } else {
       std::cerr << "ERROR: constraint function GreaterOrEqual fail."
                 << std::endl;
@@ -374,24 +374,24 @@ void ASTRuntime::resolveFunction(
       if (status.ok) {
         nodesAreEqual(input[0], input[1], output[0], status);
       }
-      std::static_pointer_cast<ValueNode>(output[0])->m_switch =
+      std::static_pointer_cast<ValueNode>(output[0])->setBoolValue(
           std::static_pointer_cast<ValueNode>(output[0])->getSwitchValue() ||
-          lesser;
+          lesser);
     } else {
       std::cerr << "ERROR: constraint function LessOrEqual fail." << std::endl;
     }
   } else if (constraintFunction->getName() == "IsNone") {
     if (input.size() == 1) {
-      std::static_pointer_cast<ValueNode>(output[0])->m_switch =
-          input[0]->getNodeType() == AST::None;
+      std::static_pointer_cast<ValueNode>(output[0])->setBoolValue(
+          input[0]->getNodeType() == AST::None);
       status.ok = true;
     } else {
       std::cerr << "ERROR: constraint function IsNone fail." << std::endl;
     }
   } else if (constraintFunction->getName() == "IsNotNone") {
     if (input.size() == 1) {
-      std::static_pointer_cast<ValueNode>(output[0])->m_switch =
-          input[0]->getNodeType() != AST::None;
+      std::static_pointer_cast<ValueNode>(output[0])->setBoolValue(
+          input[0]->getNodeType() != AST::None);
       status.ok = true;
     } else {
       std::cerr << "ERROR: constraint function IsNotNone fail." << std::endl;
