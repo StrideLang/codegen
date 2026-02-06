@@ -39,8 +39,9 @@
 
 #include "stride/codegen/builder.hpp"
 #include "stride/codegen/strideframework.hpp"
-#include "stride/codegen/stridelibrary.hpp"
 #include "stride/codegen/systemconfiguration.hpp"
+#include "stride/utils/stridelibrary.h"
+
 
 namespace strd {
 typedef struct {

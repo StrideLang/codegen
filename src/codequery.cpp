@@ -1,6 +1,6 @@
 #include "stride/codegen/codequery.hpp"
 
-#include "stride/codegen/astquery.hpp"
+#include "stride/utils/astquery.h"
 
 #include <cassert>
 #include <iostream>

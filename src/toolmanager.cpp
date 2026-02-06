@@ -5,10 +5,11 @@
 #include <fstream>
 #include <sstream>
 
-#include "stride/codegen/astfunctions.hpp"
 #include "stride/parser/blocknode.h"
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/valuenode.h"
+#include "stride/utils/astfunctions.h"
+
 
 using namespace strd;
 

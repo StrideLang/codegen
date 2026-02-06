@@ -4,16 +4,11 @@ project(StrideCodegen)
 ########## Code generation
 
 set(CODEGEN_SRC 
-  src/astfunctions.cpp
-  src/astquery.cpp
-  src/astvalidation.cpp
-  src/astruntime.cpp
   src/codevalidator.cpp
   src/coderesolver.cpp
   src/codeanalysis.cpp
   src/codequery.cpp
   src/strideframework.cpp
-  src/stridelibrary.cpp
   src/stridesystem.cpp
   src/systemconfiguration.cpp
   src/languagesyntax.cpp
@@ -21,17 +16,12 @@ set(CODEGEN_SRC
 )
 
 set(CODEGEN_HEADERS
-  include/stride/codegen/astfunctions.hpp
-  include/stride/codegen/astquery.hpp
-  include/stride/codegen/astruntime.hpp
-  include/stride/codegen/astvalidation.hpp
   include/stride/codegen/builder.hpp
   include/stride/codegen/codevalidator.hpp
   include/stride/codegen/coderesolver.hpp
   include/stride/codegen/codeanalysis.hpp
   include/stride/codegen/codequery.hpp
   include/stride/codegen/strideframework.hpp
-  include/stride/codegen/stridelibrary.hpp
   include/stride/codegen/stridesystem.hpp
   include/stride/codegen/systemconfiguration.hpp
   include/stride/codegen/languagesyntax.hpp
@@ -69,8 +59,7 @@ endif()
 target_include_directories(StrideCodegen PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include")
 
 if ("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
-    target_link_libraries(StrideCodegen dl StrideParser)
+    target_link_libraries(StrideCodegen dl StrideParser StrideUtils)
 else()
-    target_link_libraries(StrideCodegen StrideParser)
-
+    target_link_libraries(StrideCodegen StrideParser StrideUtils)
 endif()

@@ -17,10 +17,7 @@ if (NOT gtest)
 endif()
 
 
-set(TEST_SOURCES main.cpp
-  resolver.cpp
-  schema.cpp
-  library.cpp
+set(TEST_SOURCES main.cpp resolver.cpp
 )
 
 
@@ -33,7 +30,7 @@ set_target_properties(stridecodegen_tests PROPERTIES
 
 add_test(NAME stridecodegen_tests COMMAND stridecodegen_tests)
 
-target_link_libraries(stridecodegen_tests PUBLIC StrideParser StrideCodegen gtest)
+target_link_libraries(stridecodegen_tests PUBLIC StrideParser StrideUtils StrideCodegen gtest)
 target_compile_definitions(stridecodegen_tests PUBLIC
   "-DTESTS_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/data/\"")
 

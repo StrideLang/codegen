@@ -1,5 +1,5 @@
 #include "stride/codegen/systemconfiguration.hpp"
-#include "stride/codegen/astfunctions.hpp"
+#include "stride/utils/astfunctions.h"
 
 #include <fstream>
 #include <iostream>

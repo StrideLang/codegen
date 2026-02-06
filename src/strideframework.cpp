@@ -39,11 +39,12 @@
 #include <string>
 #include <vector>
 
-#include "stride/codegen/astfunctions.hpp"
-#include "stride/codegen/astquery.hpp"
 #include "stride/codegen/strideframework.hpp"
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/valuenode.h"
+#include "stride/utils/astfunctions.h"
+#include "stride/utils/astquery.h"
+
 
 using namespace std;
 using namespace strd;

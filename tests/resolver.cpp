@@ -1,8 +1,8 @@
 #include "gtest/gtest.h"
 
-#include "stride/codegen/astfunctions.hpp"
-#include "stride/codegen/astquery.hpp"
 #include "stride/codegen/coderesolver.hpp"
+#include "stride/utils/astfunctions.h"
+#include "stride/utils/astquery.h"
 // #include "stride/codegen/stridelibrary.hpp"
 
 using namespace strd;

@@ -33,11 +33,12 @@
 */
 
 #include "stride/codegen/codevalidator.hpp"
-//#include "stride/codegen/astfunctions.hpp"
-#include "stride/codegen/astquery.hpp"
-#include "stride/codegen/astruntime.hpp"
-#include "stride/codegen/astvalidation.hpp"
+//#include "stride/utils/astfunctions.h"
 #include "stride/codegen/codeanalysis.hpp"
+#include "stride/utils/astquery.h"
+#include "stride/utils/astruntime.h"
+#include "stride/utils/astvalidation.h"
+
 //#include "stride/codegen/codequery.hpp"
 #include "stride/codegen/stridesystem.hpp"
 

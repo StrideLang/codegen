@@ -1,7 +1,7 @@
 #include "stride/codegen/codeanalysis.hpp"
 
-#include "stride/codegen/astfunctions.hpp"
-#include "stride/codegen/astquery.hpp"
+#include "stride/utils/astfunctions.h"
+#include "stride/utils/astquery.h"
 
 #include <cassert>
 #include <iostream>
