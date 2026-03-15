@@ -1,0 +1,55 @@
+# Module forward
+module PassThrough {
+    ports: [
+        mainInputPort {
+            block: Input
+        }
+        mainOutputPort {
+            block: Output
+        }
+    ]
+    blocks: [
+        signal Input {}
+        signal Output {}
+    ]
+    streams: [
+        Input >> Output;
+    ]
+}
+
+signal ModuleIn {}
+signal ModuleOut {}
+signal ModuleInInt { type: _IntType}
+signal ModuleOutInt { type: _IntType}
+signal ModuleOutResolved {}
+signal ModuleInResolved {}
+
+ModuleIn >> PassThrough() >> ModuleOut; # nothing should be resolved here
+ModuleInInt >> PassThrough() >> ModuleOutResolved; # forward resolve
+ModuleInResolved >> PassThrough() >> ModuleOutInt; # reverse resolve
+
+# Forward resolution
+signal IntInput { type: _IntType }
+signal Output {}
+
+IntInput >> Output;
+
+# Reverse resolution
+signal IntOutput { type: _IntType}
+signal Input {}
+
+Input >> IntOutput;
+
+# Forward resolution recursive
+signal IntInput2 { type: _IntType}
+signal OutputA2 {}
+signal OutputB2 {}
+
+IntInput2 >> OutputA2 >> OutputB2;
+
+# Reverse resolution recursive
+signal IntOutput2 { type: _IntType}
+signal InputA2 {}
+signal InputB2 {}
+
+InputA2 >> InputB2 >> IntOutput2;

@@ -88,6 +88,9 @@ private:
   // Sub functions
   void resolveStreamRatesReverse(std::shared_ptr<StreamNode> stream);
   void resolveStreamRates(std::shared_ptr<StreamNode> stream);
+  void resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream);
+  void resolveStreamTypesForward(std::shared_ptr<StreamNode> stream);
+
   void expandParallelStream(std::shared_ptr<StreamNode> stream,
                             ScopeStack scopeStack, ASTNode tree);
 
@@ -151,6 +154,8 @@ private:
                               ScopeStack scopeStack);
 
   void setNodeRate(ASTNode node, double rate, ScopeStack scope, ASTNode tree);
+  void setNodeType(ASTNode node, std::shared_ptr<BlockNode> type,
+                   ScopeStack scope, ASTNode tree);
 
   void setInputBlockForFunction(std::shared_ptr<FunctionNode> func,
                                 ScopeStack scopeStack, ASTNode previous);

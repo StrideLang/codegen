@@ -7,6 +7,92 @@
 
 using namespace strd;
 
+TEST(Resolver, ResolveTypes) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree;
+  tree = AST::parseFile(TESTS_SOURCE_DIR "resolver/resolve_types.stride");
+  EXPECT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  {
+    auto decl = ASTQuery::findDeclarationByName("Output", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    EXPECT_TRUE(dataType);
+    EXPECT_EQ(dataType->getNodeType(), AST::Block);
+    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+              "_IntType");
+  }
+  {
+    auto decl = ASTQuery::findDeclarationByName("Input", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    EXPECT_TRUE(dataType);
+    EXPECT_EQ(dataType->getNodeType(), AST::Block);
+    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+              "_IntType");
+  }
+  {
+    auto decl = ASTQuery::findDeclarationByName("OutputB2", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    EXPECT_TRUE(dataType);
+    EXPECT_EQ(dataType->getNodeType(), AST::Block);
+    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+              "_IntType");
+  }
+  {
+    auto decl = ASTQuery::findDeclarationByName("InputA2", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    EXPECT_TRUE(dataType);
+    EXPECT_EQ(dataType->getNodeType(), AST::Block);
+    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+              "_IntType");
+  }
+  // ModuleIn >> PassThrough() >> ModuleOut; # nothing should be resolved here
+  // ModuleInInt >> PassThrough() >> ModuleOutResolved; # forward resolve
+  // ModuleInResolved >> PassThrough() >> ModuleOutInt; # reverse resolve
+  {
+    auto decl =
+        ASTQuery::findDeclarationByName("ModuleOut", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    EXPECT_TRUE(dataType);
+    EXPECT_EQ(dataType->getNodeType(), AST::None);
+  }
+  {
+    auto decl = ASTQuery::findDeclarationByName("ModuleIn", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    EXPECT_TRUE(dataType);
+    EXPECT_EQ(dataType->getNodeType(), AST::None);
+  }
+  {
+    auto decl = ASTQuery::findDeclarationByName("ModuleOutResolved",
+                                                ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    EXPECT_TRUE(dataType);
+    EXPECT_EQ(dataType->getNodeType(), AST::Block);
+    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+              "_IntType");
+  }
+  {
+    auto decl =
+        ASTQuery::findDeclarationByName("ModuleInResolved", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    EXPECT_TRUE(dataType);
+    EXPECT_EQ(dataType->getNodeType(), AST::Block);
+    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+              "_IntType");
+  }
+}
+
 TEST(Resolver, SelfPort) {
   auto strideroot = ASTFunctions::getDefaultStrideRoot();
   ASTNode tree;

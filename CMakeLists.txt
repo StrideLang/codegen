@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13) 
-project(StrideCodegen) 
+project(stridecodegen)
 
 ########## Code generation
 
@@ -7,7 +7,6 @@ set(CODEGEN_SRC
   src/codevalidator.cpp
   src/coderesolver.cpp
   src/codeanalysis.cpp
-  src/codequery.cpp
   src/strideframework.cpp
   src/stridesystem.cpp
   src/systemconfiguration.cpp
@@ -20,7 +19,6 @@ set(CODEGEN_HEADERS
   include/stride/codegen/codevalidator.hpp
   include/stride/codegen/coderesolver.hpp
   include/stride/codegen/codeanalysis.hpp
-  include/stride/codegen/codequery.hpp
   include/stride/codegen/strideframework.hpp
   include/stride/codegen/stridesystem.hpp
   include/stride/codegen/systemconfiguration.hpp

@@ -42,7 +42,6 @@
 #include "stride/codegen/systemconfiguration.hpp"
 #include "stride/utils/stridelibrary.h"
 
-
 namespace strd {
 typedef struct {
   ASTNode sourceStreams;
@@ -127,7 +126,7 @@ public:
   std::vector<std::pair<std::string, std::string>>
   getFrameworkAliasInherits(std::string frameworkAlias);
 
-  std::string getDataType(ASTNode node, ASTNode tree);
+  std::string getDataType(ASTNode node, const ScopeStack &scope, ASTNode tree);
 
   std::vector<std::shared_ptr<StrideFramework>> m_frameworks;
   std::vector<std::shared_ptr<DeclarationNode>> m_platformDefinitions;

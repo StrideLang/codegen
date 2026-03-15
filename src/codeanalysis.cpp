@@ -1811,17 +1811,87 @@ CodeAnalysis::findDataTypeDeclaration(std::string dataTypeName, ASTNode tree) {
   return nullptr;
 }
 
+std::shared_ptr<BlockNode>
+CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
+                               ASTNode tree) {
+  // TODO identify signal and module from inheritance
+  // TODO support bundle
+  if (node->getNodeType() == AST::Block) {
+    auto block = std::static_pointer_cast<BlockNode>(node);
+    auto decl = ASTQuery::findDeclarationByName(block->getName(), scope, tree);
+    if (decl) {
+      if (decl->getObjectType() == "signal") {
+        // For now only resolve types for signals, perhaps in the future resolve
+        // from all declarations that inherit from "Typed"
+        return getDataTypeForSignalDeclaration(decl);
+      } else {
+        std::cerr << " Could not find type property in:" << decl->toText()
+                  << std::endl;
+      }
+    } else {
+      std::cerr << " Could not find node declaration for " << block->getName()
+                << std::endl;
+    }
+  } else if (node->getNodeType() == AST::Function) {
+    // TODO implement
+    return nullptr;
+  }
+  return nullptr;
+}
+
+std::shared_ptr<BlockNode>
+CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
+                                ASTNode tree) {
+  // TODO identify signal and module from inheritance
+  // TODO support bundle
+  if (node->getNodeType() == AST::Block) {
+    auto block = std::static_pointer_cast<BlockNode>(node);
+    auto decl = ASTQuery::findDeclarationByName(block->getName(), scope, tree);
+    if (decl) {
+      if (decl->getObjectType() == "signal") {
+        // For now only resolve types for signals, perhaps in the future
+        // resolve from all declarations that inherit from "Typed"
+        return getDataTypeForSignalDeclaration(decl);
+      }
+    } else {
+      std::cerr << " Could not find node declaration for " << block->getName()
+                << std::endl;
+    }
+  } else if (node->getNodeType() == AST::Function) {
+    assert(0 == 1); // TODO implement
+  }
+  return nullptr;
+}
+
+std::shared_ptr<BlockNode> CodeAnalysis::getDataTypeForSignalDeclaration(
+    std::shared_ptr<DeclarationNode> decl) {
+  assert(decl->getObjectType() == "signal");
+  auto typeNode = decl->getPropertyValue("type");
+  if (typeNode) {
+    if (typeNode->getNodeType() == AST::Block) {
+      return std::static_pointer_cast<BlockNode>(typeNode);
+    } else if (typeNode->getNodeType() == AST::None) {
+      return nullptr;
+    }
+  }
+  std::cerr << __FILE__ << ":" << __LINE__
+            << " ERROR unsupported object type. Will treat as 'none'"
+            << std::endl;
+  return nullptr;
+}
+
 std::string
 CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
-                                        ASTNode tree) {
+                                        ScopeStack scope, ASTNode tree) {
   if (decl->getObjectType() == "signal") {
-    auto typeNode = decl->getPropertyValue("type");
+    auto typeNode = getDataTypeForSignalDeclaration(decl);
     if (typeNode) {
       if (typeNode->getNodeType() == AST::Block) {
         return std::static_pointer_cast<BlockNode>(typeNode)->getName();
       } else if (typeNode->getNodeType() == AST::None) {
         // FIXME we should resolve the types in CodeResolver.
         return "_RealType";
+        // return "";
       }
     }
     std::cerr << __FILE__ << ":" << __LINE__ << " ERROR unsupported object type"
@@ -1829,9 +1899,11 @@ CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
     assert(0 == 1);
 
   } else if (decl->getObjectType() == "constant") {
-    // TODO should constants take value from their given value or an
-    // additional port?
-    //    return getDataType(decl->getPropertyValue("value"), tree);
+    std::shared_ptr<PropertyNode> property =
+        ASTQuery::findPropertyByName(decl->getProperties(), "value");
+    if (property) {
+      return resolveNodeOutDataType(property->getValue(), scope, tree);
+    }
   } else if (decl->getObjectType() == "string") {
     return "_StringType";
   } else {
@@ -1839,4 +1911,173 @@ CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
     //    object type";
   }
   return std::string();
+}
+
+std::string CodeAnalysis::resolveBundleDataType(BundleNode *bundle,
+                                                ScopeStack scopeStack,
+                                                ASTNode tree) {
+  std::shared_ptr<DeclarationNode> declaration =
+      ASTQuery::findDeclarationByName(bundle->getName(), scopeStack, tree);
+  if (declaration) {
+    if (declaration->getObjectType() == "constant") {
+      std::shared_ptr<PropertyNode> property =
+          ASTQuery::findPropertyByName(declaration->getProperties(), "value");
+      if (property) {
+        return resolveNodeOutDataType(property->getValue(), scopeStack, tree);
+      }
+    } else if (declaration->getObjectType() == "signal") {
+      std::vector<std::shared_ptr<PropertyNode>> properties =
+          declaration->getProperties();
+      ASTNode typeNode = declaration->getPropertyValue("type");
+      if (typeNode && typeNode->getNodeType() == AST::Block) {
+        return std::static_pointer_cast<BlockNode>(typeNode)->getName();
+      }
+      return "";
+    }
+  }
+  return "";
+}
+
+std::string CodeAnalysis::resolveBlockDataType(BlockNode *name,
+                                               ScopeStack scopeStack,
+                                               ASTNode tree) {
+  std::shared_ptr<DeclarationNode> declaration =
+      ASTQuery::findDeclarationByName(name->getName(), scopeStack, tree);
+  if (declaration) {
+    if (declaration->getObjectType() == "constant") {
+      std::vector<std::shared_ptr<PropertyNode>> properties =
+          declaration->getProperties();
+      std::shared_ptr<PropertyNode> property =
+          ASTQuery::findPropertyByName(properties, "value");
+      if (property) {
+        return resolveNodeOutDataType(property->getValue(), scopeStack, tree);
+      }
+    } else if (declaration->getObjectType() == "signal") {
+      std::vector<std::shared_ptr<PropertyNode>> properties =
+          declaration->getProperties();
+      ASTNode typeNode = declaration->getPropertyValue("type");
+      if (typeNode && typeNode->getNodeType() == AST::Block) {
+        return std::static_pointer_cast<BlockNode>(typeNode)->getName();
+      }
+      return "";
+    } else {
+      return "";
+    }
+  }
+  return "";
+}
+
+std::string CodeAnalysis::resolveNodeOutDataType(ASTNode node,
+                                                 ScopeStack scopeStack,
+                                                 ASTNode tree) {
+  if (node->getNodeType() == AST::Int) {
+    return "_IntType";
+  } else if (node->getNodeType() == AST::Real) {
+    return "_RealType";
+  } else if (node->getNodeType() == AST::Switch) {
+    return "_SwitchType";
+  } else if (node->getNodeType() == AST::String) {
+    return "_StringType";
+  } else if (node->getNodeType() == AST::List) {
+    return resolveListDataType(static_cast<ListNode *>(node.get()), scopeStack,
+                               tree);
+  } else if (node->getNodeType() == AST::Bundle) {
+    return resolveBundleDataType(static_cast<BundleNode *>(node.get()),
+                                 scopeStack, tree);
+  } else if (node->getNodeType() == AST::Expression) {
+    return resolveExpressionDataType(static_cast<ExpressionNode *>(node.get()),
+                                     scopeStack, tree);
+  } else if (node->getNodeType() == AST::Block) {
+    return resolveBlockDataType(static_cast<BlockNode *>(node.get()),
+                                scopeStack, tree);
+  } else if (node->getNodeType() == AST::Range) {
+    return resolveRangeDataType(static_cast<RangeNode *>(node.get()),
+                                scopeStack, tree);
+  } else if (node->getNodeType() == AST::PortProperty) {
+    return resolvePortPropertyDataType(
+        static_cast<PortPropertyNode *>(node.get()), scopeStack, tree);
+  }
+  return "";
+}
+
+std::string CodeAnalysis::resolveListDataType(ListNode *listnode,
+                                              ScopeStack scopeStack,
+                                              ASTNode tree) {
+  std::vector<ASTNode> members = listnode->getChildren();
+  if (members.size() == 0) {
+    return "";
+  }
+  ASTNode firstMember = members.at(0);
+  auto type = resolveNodeOutDataType(firstMember, scopeStack, tree);
+
+  for (const ASTNode &member : members) {
+    auto nextPortType = resolveNodeOutDataType(member, scopeStack, tree);
+    if (type != nextPortType) {
+      if (type == "_IntType" &&
+          nextPortType == "_RealType") { // List becomes Real if Real found
+        type = "_RealType";
+      } else if (type == "_RealType" &&
+                 nextPortType == "_IntType") { // Int in Real list
+                                               // Nothing here for now
+      } else {                                 // Invalid combination
+        return "";
+      }
+    }
+  }
+  return type;
+}
+
+std::string CodeAnalysis::resolveExpressionDataType(ExpressionNode *exprnode,
+                                                    ScopeStack scopeStack,
+                                                    ASTNode tree) {
+  if (!exprnode->isUnary()) {
+    ASTNode left = exprnode->getLeft();
+    ASTNode right = exprnode->getRight();
+    auto leftType = resolveNodeOutDataType(left, scopeStack, tree);
+    auto rightType = resolveNodeOutDataType(right, scopeStack, tree);
+
+    auto type = leftType;
+    if (type != rightType) {
+      if (type == "_IntType" &&
+          rightType == "_RealType") { // Expr becomes Real if Real found
+        type = "_RealType";
+      } else if (type == "_RealType" && rightType == "_IntType") {
+        // Int in Real list
+        // Nothing here for now
+      } else { // Invalid combination
+        return "";
+      }
+    }
+    return type;
+
+  } else {
+
+    return resolveNodeOutDataType(exprnode->getValue(), scopeStack, tree);
+  }
+}
+
+std::string CodeAnalysis::resolveRangeDataType(RangeNode *rangenode,
+                                               ScopeStack scopeStack,
+                                               ASTNode tree) {
+  auto leftType =
+      resolveNodeOutDataType(rangenode->startIndex(), scopeStack, tree);
+  auto rightType =
+      resolveNodeOutDataType(rangenode->endIndex(), scopeStack, tree);
+  if (leftType == rightType) {
+    return leftType;
+  }
+  return "";
+}
+
+std::string
+CodeAnalysis::resolvePortPropertyDataType(PortPropertyNode *portproperty,
+                                          ScopeStack scopeStack, ASTNode tree) {
+  // FIXME implement correctly. Should be read from framework?
+  // Should call CodeResolver::resolvePortProperty then get type
+  if (portproperty->getPortName() == "size") {
+    return "_IntType";
+  } else if (portproperty->getPortName() == "rate") {
+    return "_RealType";
+  }
+  return "_RealType";
 }

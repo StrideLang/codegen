@@ -50,7 +50,6 @@
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
 
-
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/propertynode.h"
 //#include "pythonproject.h"
@@ -900,8 +899,9 @@ StrideSystem::getFrameworkAliasInherits(std::string frameworkAlias) {
   return std::vector<std::pair<std::string, std::string>>();
 }
 
-std::string StrideSystem::getDataType(ASTNode node, ASTNode tree) {
-  for (auto child : tree->getChildren()) {
+std::string StrideSystem::getDataType(ASTNode node, const ScopeStack &scope,
+                                      ASTNode tree) {
+  for (const auto &child : tree->getChildren()) {
     if (child->getNodeType() == AST::Block) {
       std::string domainId = CodeAnalysis::getDomainIdentifier(node, {}, tree);
       auto frameworkName = CodeAnalysis::getFrameworkForDomain(domainId, tree);
@@ -910,21 +910,21 @@ std::string StrideSystem::getDataType(ASTNode node, ASTNode tree) {
           ASTQuery::getNodeName(child), {}, tree, child->getNamespaceList());
 
       if (decl) {
-        return CodeAnalysis::getDataTypeForDeclaration(decl, tree);
+        return CodeAnalysis::getDataTypeForDeclaration(decl, scope, tree);
       } else {
         std::cerr << __FILE__ << ":" << __LINE__
                   << " ERROR, could not find declaration for node" << std::endl;
       }
     } else if (child->getNodeType() == AST::Declaration) {
       auto nodeDecl = std::static_pointer_cast<DeclarationNode>(child);
-      return CodeAnalysis::getDataTypeForDeclaration(nodeDecl, tree);
+      return CodeAnalysis::getDataTypeForDeclaration(nodeDecl, scope, tree);
     }
   }
   return std::string();
 }
 
 std::string StrideSystem::getFrameworkAlias(std::string frameworkName) {
-  for (auto platform : m_frameworks) {
+  for (const auto &platform : m_frameworks) {
     if (frameworkName == platform->getFramework()) {
       return platform->getRootNamespace();
     }
@@ -933,7 +933,7 @@ std::string StrideSystem::getFrameworkAlias(std::string frameworkName) {
 }
 
 std::string StrideSystem::getFrameworkFromAlias(std::string frameworkAlias) {
-  for (auto platform : m_frameworks) {
+  for (const auto &platform : m_frameworks) {
     if (frameworkAlias == platform->getRootNamespace()) {
       return platform->getFramework();
     }
