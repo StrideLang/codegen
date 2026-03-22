@@ -17,7 +17,10 @@ if (NOT gtest)
 endif()
 
 
-set(TEST_SOURCES main.cpp resolver.cpp
+set(TEST_SOURCES
+  main.cpp
+  resolver.cpp
+  compiler_properties.cpp
 )
 
 

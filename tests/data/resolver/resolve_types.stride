@@ -1,4 +1,33 @@
-# Module forward
+######################################
+# Module resolution with internal type
+module PassThroughWithType {
+    ports: [
+        mainInputPort {
+            block: Input
+        }
+        mainOutputPort {
+            block: Output
+        }
+    ]
+    blocks: [
+        signal Input { type: _RealType }
+        signal Output { type: _RealType }
+    ]
+    streams: [
+        Input >> Output;
+    ]
+}
+
+signal ModuleInInt { type: _IntType}
+signal ModuleOutInt { type: _IntType}
+signal ModuleWithTypeOutResolved {}
+signal ModuleWithTypeInResolved {}
+
+ModuleInInt >> PassThroughWithType() >> ModuleWithTypeOutResolved;
+ModuleWithTypeInResolved >> PassThroughWithType() >> ModuleOutInt;
+
+###################
+# Module resolution
 module PassThrough {
     ports: [
         mainInputPort {
@@ -28,6 +57,7 @@ ModuleIn >> PassThrough() >> ModuleOut; # nothing should be resolved here
 ModuleInInt >> PassThrough() >> ModuleOutResolved; # forward resolve
 ModuleInResolved >> PassThrough() >> ModuleOutInt; # reverse resolve
 
+####################
 # Forward resolution
 signal IntInput { type: _IntType }
 signal Output {}
@@ -53,3 +83,28 @@ signal InputA2 {}
 signal InputB2 {}
 
 InputA2 >> InputB2 >> IntOutput2;
+
+###########################
+# Forward resolution bundle
+signal IntInputBundle[2] { type: _IntType }
+signal OutputBundle[2] {}
+
+IntInputBundle >> OutputBundle;
+
+# Reverse resolution bundle
+signal IntOutputBundle { type: _IntType}
+signal InputBundle {}
+
+InputBundle >> IntOutputBundle;
+
+# Forward resolution bundle member
+signal IntInputBundleMember[2] { type: _IntType }
+signal OutputBundleMember[2] {}
+
+IntInputBundleMember[0] >> OutputBundleMember[0];
+
+# Reverse resolution bundle member
+signal IntOutputBundleMember[2] { type: _IntType}
+signal InputBundleMember[2] {}
+
+InputBundleMember[0] >> IntOutputBundleMember[0];

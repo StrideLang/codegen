@@ -115,13 +115,15 @@ void CodeResolver::process() {
 
   processDeclarations();
   processDomains();
-  resolveRates();
 
   // Prepare additional metadata
   storeDeclarations();
-  resolveTypeCasting();
   analyzeConnections();
   analyzeParents();
+
+  // Resolve rates and types from stream connections
+  resolveRates();
+  resolveTypeCasting();
 }
 
 void CodeResolver::processSystem() {
@@ -264,7 +266,7 @@ void CodeResolver::resolveStreamTypesReverse(
     std::shared_ptr<StreamNode> stream) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
-  auto type = CodeAnalysis::getInputDataType(left, {}, m_tree);
+  auto type = CodeAnalysis::getOutputDataType(left, {}, m_tree);
   std::shared_ptr<BlockNode> rightType;
   if (right->getNodeType() == AST::Stream) {
     resolveStreamTypesReverse(std::static_pointer_cast<StreamNode>(right));
@@ -273,7 +275,7 @@ void CodeResolver::resolveStreamTypesReverse(
   } else {
     rightType = CodeAnalysis::getInputDataType(right, {}, m_tree);
   }
-  if (rightType) {
+  if (rightType && (!type || type->getNodeType() != AST::None)) {
     CodeResolver::setNodeType(left, rightType, {}, m_tree);
   }
 }
@@ -1493,22 +1495,18 @@ void CodeResolver::setNodeType(ASTNode node, std::shared_ptr<BlockNode> type,
     }
     return;
   } else if (node->getNodeType() == AST::Bundle) {
-    assert(0 == 1); // TODO implement
-    // BundleNode *bundle = static_cast<BundleNode *>(node.get());
-    // std::shared_ptr<DeclarationNode> declaration =
-    //     ASTQuery::findDeclarationByName(bundle->getName(), scope, tree,
-    //                                     bundle->getNamespaceList());
-    // if (declaration) {
-    //     std::shared_ptr<ValueNode> value =
-    //         std::make_shared<ValueNode>(rate, __FILE__, __LINE__);
-    //     if (!declaration->replacePropertyValue("rate", value)) {
-    //         std::cerr << "Couldn't set rate. Rate property does not exist."
-    //                   << std ::endl;
-    //     }
-    // }
-    // return;
+    BundleNode *bundle = static_cast<BundleNode *>(node.get());
+    std::shared_ptr<DeclarationNode> declaration =
+        ASTQuery::findDeclarationByName(bundle->getName(), scope, tree,
+                                        bundle->getNamespaceList());
+    if (declaration) {
+      auto oldType = declaration->getPropertyValue("type");
+      if (oldType == nullptr || oldType->getNodeType() == AST::None) {
+        declaration->setPropertyValue("type", type);
+      }
+    }
   } else if (node->getNodeType() == AST::Function) {
-    assert(0 == 1); // TODO implement
+    // assert(0 == 1); // TODO implement
     // FunctionNode *func = static_cast<FunctionNode *>(node.get());
     // func->setRate(rate);
   } else if (node->getNodeType() == AST::List ||
