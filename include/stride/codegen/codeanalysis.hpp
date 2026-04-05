@@ -128,15 +128,15 @@ public:
   static std::shared_ptr<DeclarationNode>
   findDataTypeDeclaration(std::string dataTypeName, ASTNode tree);
 
-  static std::shared_ptr<BlockNode>
-  getInputDataType(ASTNode node, const ScopeStack &scope, ASTNode tree);
-  static std::shared_ptr<BlockNode>
-  getOutputDataType(ASTNode node, const ScopeStack &scope, ASTNode tree);
-  static std::shared_ptr<BlockNode>
+  static ASTNode getInputDataType(ASTNode node, const ScopeStack &scope,
+                                  ASTNode tree);
+  static ASTNode getOutputDataType(ASTNode node, const ScopeStack &scope,
+                                   ASTNode tree);
+  static ASTNode
   getDataTypeForSignalDeclaration(std::shared_ptr<DeclarationNode> decl);
   static std::string
-  getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl, ScopeStack scope,
-                            ASTNode tree);
+  getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
+                            ScopeStack scope, ASTNode tree);
 
   static std::string resolveBundleDataType(BundleNode *bundle,
                                            ScopeStack scopeStack, ASTNode tree);

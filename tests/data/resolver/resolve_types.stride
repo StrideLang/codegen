@@ -1,3 +1,67 @@
+###################
+# Module resolution forward
+module PassThroughForward {
+    ports: [
+        mainInputPort InputPort {
+            block: Input
+        }
+        mainOutputPort OutputPort {
+            block: Output
+        }
+    ]
+    blocks: [
+        signal Input { type: InputPort.type rate: InputPort.rate}
+        signal Output { type: InputPort.type rate: InputPort.rate}
+    ]
+    streams: [
+        Input >> Output;
+    ]
+    meta: "Pass attributes from input"
+}
+
+signal ForwardModuleIn {}
+signal ForwardModuleOut {}
+signal ForwardModuleInInt { type: _IntType}
+signal ForwardModuleOutInt { type: _IntType}
+signal ForwardModuleOutResolved {}
+signal ForwardModuleInNotResolved {}
+
+ForwardModuleIn >> PassThroughForward() >> ForwardModuleOut; # nothing should be resolved here
+ForwardModuleInInt >> PassThroughForward() >> ForwardModuleOutResolved; # forward resolve
+ForwardModuleInNotResolved >> PassThroughForward() >> ForwardModuleOutInt; # reverse resolve, not resolved
+
+###################
+# Module resolution reverse
+module PassThrough {
+    ports: [
+        mainInputPort InputPort {
+            block: Input
+        }
+        mainOutputPort OutputPort {
+            block: Output
+        }
+    ]
+    blocks: [
+        signal Input { type: OutputPort.type}
+        signal Output { type: OutputPort.type}
+    ]
+    streams: [
+        Input >> Output;
+    ]
+    meta: "Pass attributes from output"
+}
+
+signal ModuleIn {}
+signal ModuleOut {}
+signal ModuleInInt { type: _IntType}
+signal ModuleOutInt { type: _IntType}
+signal ModuleOutNotResolved {}
+signal ModuleInResolved {}
+
+ModuleIn >> PassThrough() >> ModuleOut; # nothing should be resolved here
+ModuleInInt >> PassThrough() >> ModuleOutNotResolved; # forward resolve, not resolved
+ModuleInResolved >> PassThrough() >> ModuleOutInt; # reverse resolve
+
 ######################################
 # Module resolution with internal type
 module PassThroughWithType {
@@ -25,37 +89,6 @@ signal ModuleWithTypeInResolved {}
 
 ModuleInInt >> PassThroughWithType() >> ModuleWithTypeOutResolved;
 ModuleWithTypeInResolved >> PassThroughWithType() >> ModuleOutInt;
-
-###################
-# Module resolution
-module PassThrough {
-    ports: [
-        mainInputPort {
-            block: Input
-        }
-        mainOutputPort {
-            block: Output
-        }
-    ]
-    blocks: [
-        signal Input {}
-        signal Output {}
-    ]
-    streams: [
-        Input >> Output;
-    ]
-}
-
-signal ModuleIn {}
-signal ModuleOut {}
-signal ModuleInInt { type: _IntType}
-signal ModuleOutInt { type: _IntType}
-signal ModuleOutResolved {}
-signal ModuleInResolved {}
-
-ModuleIn >> PassThrough() >> ModuleOut; # nothing should be resolved here
-ModuleInInt >> PassThrough() >> ModuleOutResolved; # forward resolve
-ModuleInResolved >> PassThrough() >> ModuleOutInt; # reverse resolve
 
 ####################
 # Forward resolution

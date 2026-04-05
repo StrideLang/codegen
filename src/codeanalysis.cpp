@@ -1811,9 +1811,8 @@ CodeAnalysis::findDataTypeDeclaration(std::string dataTypeName, ASTNode tree) {
   return nullptr;
 }
 
-std::shared_ptr<BlockNode>
-CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
-                               ASTNode tree) {
+ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
+                                       ASTNode tree) {
   // TODO identify signal and module from inheritance
   // TODO support bundle
   if (node->getNodeType() == AST::Block) {
@@ -1863,7 +1862,41 @@ CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
         if (blockNodeDecl && blockNodeDecl->getObjectType() == "signal") {
           auto dataType = getDataTypeForSignalDeclaration(blockNodeDecl);
           if (dataType) {
-            return dataType;
+            if (dataType->getNodeType() == AST::PortProperty) {
+              auto dataTypePortBlock =
+                  std::static_pointer_cast<PortPropertyNode>(dataType);
+              if (dataTypePortBlock->getName() == inputPortBlock->getName()) {
+                auto connected = func->getCompilerProperty("mainInput");
+                if (connected) {
+                  auto connectedDecl =
+                      connected->getCompilerProperty("declaration");
+                  if (connectedDecl &&
+                      connectedDecl->getNodeType() == AST::Declaration) {
+                    return std::static_pointer_cast<DeclarationNode>(
+                               connectedDecl)
+                        ->getPropertyValue("type");
+                  }
+                }
+              } else {
+                // TODO resolve for function secondary ports
+                // https://github.com/StrideLang/codegen/issues/3
+                auto outputPortBlock =
+                    ASTQuery::getModuleMainOutputPortBlock(funcDecl);
+                if (outputPortBlock) {
+                  if (dataTypePortBlock->getName() ==
+                      outputPortBlock->getName()) {
+                    auto connected = func->getCompilerProperty("mainOutput");
+                    if (connected) {
+                      return getInputDataType(connected, scope, tree);
+                    } else {
+                      return nullptr;
+                    }
+                  }
+                }
+              }
+            } else {
+              return dataType;
+            }
           }
         }
       }
@@ -1882,9 +1915,8 @@ CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
   return nullptr;
 }
 
-std::shared_ptr<BlockNode>
-CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
-                                ASTNode tree) {
+ASTNode CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
+                                        ASTNode tree) {
   // TODO identify signal and module from inheritance
   // TODO support bundle
   if (node->getNodeType() == AST::Block) {
@@ -1921,6 +1953,7 @@ CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
       return nullptr;
     }
     // first check if output block in module has a defined type
+    // then check connected blocks agains port block definitions
     auto outputPortBlock = ASTQuery::getModuleMainOutputPortBlock(funcDecl);
     if (outputPortBlock) {
       auto outputBlockNode = outputPortBlock->getPropertyValue("block");
@@ -1931,27 +1964,58 @@ CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
         if (blockNodeDecl && blockNodeDecl->getObjectType() == "signal") {
           auto dataType = getDataTypeForSignalDeclaration(blockNodeDecl);
           if (dataType) {
-            return dataType;
+            if (dataType->getNodeType() == AST::PortProperty) {
+              auto dataTypePortBlock =
+                  std::static_pointer_cast<PortPropertyNode>(dataType);
+              if (dataTypePortBlock->getName() == outputPortBlock->getName()) {
+                auto connected = func->getCompilerProperty("mainOutput");
+                if (connected) {
+                  auto connectedDecl =
+                      connected->getCompilerProperty("declaration");
+                  if (connectedDecl &&
+                      connectedDecl->getNodeType() == AST::Declaration) {
+                    return std::static_pointer_cast<DeclarationNode>(
+                               connectedDecl)
+                        ->getPropertyValue("type");
+                  }
+                }
+              } else {
+                // TODO resolve for function secondary ports
+                // https://github.com/StrideLang/codegen/issues/3
+                auto inputPortBlock =
+                    ASTQuery::getModuleMainInputPortBlock(funcDecl);
+                if (inputPortBlock) {
+                  if (dataTypePortBlock->getName() ==
+                      inputPortBlock->getName()) {
+                    auto connected = func->getCompilerProperty("mainInput");
+                    if (connected) {
+                      return getOutputDataType(connected, scope, tree);
+                    } else {
+                      return nullptr;
+                    }
+                  }
+                }
+              }
+            } else {
+              return dataType;
+            }
           }
         }
       }
-    }
-
-    // then check to see if the outer input block has a defined type
-    if (auto outerInputBlock = func->getCompilerProperty("outputBlock")) {
-      // TODO complete
     }
   }
   return nullptr;
 }
 
-std::shared_ptr<BlockNode> CodeAnalysis::getDataTypeForSignalDeclaration(
+ASTNode CodeAnalysis::getDataTypeForSignalDeclaration(
     std::shared_ptr<DeclarationNode> decl) {
   assert(decl->getObjectType() == "signal");
   auto typeNode = decl->getPropertyValue("type");
   if (typeNode) {
     if (typeNode->getNodeType() == AST::Block) {
       return std::static_pointer_cast<BlockNode>(typeNode);
+    } else if (typeNode->getNodeType() == AST::PortProperty) {
+      return typeNode;
     } else if (typeNode->getNodeType() == AST::List) {
       // option for bundles
       assert(0 == 1); // TODO implement

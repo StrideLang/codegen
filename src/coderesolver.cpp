@@ -122,7 +122,8 @@ void CodeResolver::process() {
   analyzeParents();
 
   // Resolve rates and types from stream connections
-  resolveRates();
+  setPortBlockAttributes();
+  resolveAttributes();
   resolveTypeCasting();
 }
 
@@ -262,52 +263,43 @@ void CodeResolver::resolveStreamRates(std::shared_ptr<StreamNode> stream) {
   }
 }
 
-void CodeResolver::resolveStreamTypesReverse(
-    std::shared_ptr<StreamNode> stream) {
+void CodeResolver::resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
+                                             ScopeStack stack, ASTNode tree) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
-  auto type = CodeAnalysis::getOutputDataType(left, {}, m_tree);
-  std::shared_ptr<BlockNode> rightType;
+  auto type = CodeAnalysis::getOutputDataType(left, stack, tree);
+  ASTNode rightType;
   if (right->getNodeType() == AST::Stream) {
-    resolveStreamTypesReverse(std::static_pointer_cast<StreamNode>(right));
+    resolveStreamTypesReverse(std::static_pointer_cast<StreamNode>(right),
+                              stack, tree);
     rightType = CodeAnalysis::getInputDataType(
-        std::static_pointer_cast<StreamNode>(right)->getLeft(), {}, m_tree);
+        std::static_pointer_cast<StreamNode>(right)->getLeft(), stack, tree);
   } else {
-    rightType = CodeAnalysis::getInputDataType(right, {}, m_tree);
+    rightType = CodeAnalysis::getInputDataType(right, stack, tree);
   }
   if (rightType && (!type || type->getNodeType() != AST::None)) {
-    CodeResolver::setNodeType(left, rightType, {}, m_tree);
+    if (rightType->getNodeType() == AST::PortProperty) {
+      CodeResolver::setNodeType(left, rightType, stack, tree);
+    } else {
+      CodeResolver::setNodeType(left, rightType, stack, tree);
+    }
   }
 }
 
-void CodeResolver::resolveStreamTypesForward(
-    std::shared_ptr<StreamNode> stream) {
-  // ASTNode left = stream->getLeft();
-  // ASTNode right = stream->getRight();
-  // auto type = CodeAnalysis::getInputDataType(left, {}, m_tree);
-  // std::shared_ptr<BlockNode> rightType;
-  // if (right->getNodeType() == AST::Stream) {
-  //   resolveStreamRatesReverse(std::static_pointer_cast<StreamNode>(right));
-  //   rightType = CodeAnalysis::getInputDataType(
-  //       std::static_pointer_cast<StreamNode>(right)->getLeft(), {}, m_tree);
-  // } else {
-  //   rightType = CodeAnalysis::getInputDataType(right, {}, m_tree);
-  // }
-  // if (rightType) {
-  //   CodeResolver::setNodeType(left, rightType, {}, m_tree);
-  // }
-
+void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
+                                             ScopeStack stack, ASTNode tree) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
   auto type = CodeAnalysis::getOutputDataType(left, {}, m_tree);
   if (type == nullptr || type->getNodeType() == AST::None) {
     if (right->getNodeType() == AST::Stream) {
       // left node can't provide type, so keep resolving for rest of stream node
-      resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right));
+      resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right), {},
+                                tree);
     }
     return;
   }
-  std::shared_ptr<BlockNode> rightType;
+  ASTNode rightType;
   if (right->getNodeType() == AST::Stream) {
     rightType = CodeAnalysis::getInputDataType(
         std::static_pointer_cast<StreamNode>(right)->getLeft(), {}, m_tree);
@@ -315,7 +307,8 @@ void CodeResolver::resolveStreamTypesForward(
       CodeResolver::setNodeType(
           static_cast<StreamNode *>(right.get())->getLeft(), type, {}, m_tree);
     }
-    resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right));
+    resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right), {},
+                              tree);
   } else {
     rightType = CodeAnalysis::getInputDataType(right, {}, m_tree);
     if (rightType == nullptr || rightType->getNodeType() == AST::None) {
@@ -365,7 +358,7 @@ void CodeResolver::enableTesting() {
           treeChildren[i]->getNodeType() == AST::BundleDeclaration) {
         std::shared_ptr<DeclarationNode> decl =
             std::static_pointer_cast<DeclarationNode>(treeChildren[i]);
-        for (ASTNode testingObj : testingObjs) {
+        for (const ASTNode &testingObj : testingObjs) {
           if (testingObj->getNodeType() == AST::Declaration ||
               testingObj->getNodeType() == AST::BundleDeclaration) {
             std::shared_ptr<DeclarationNode> testDecl =
@@ -387,7 +380,7 @@ void CodeResolver::enableTesting() {
 }
 
 void CodeResolver::declareModuleInternalBlocks() {
-  for (ASTNode node : m_tree->getChildren()) {
+  for (const ASTNode &node : m_tree->getChildren()) {
     declareInternalBlocksForNode(node, {});
   }
 
@@ -500,7 +493,7 @@ void CodeResolver::processDeclarations() {
 
   std::function<void(std::vector<ASTNode>)> processDeclarationsForTree =
       [&](std::vector<ASTNode> children) {
-        for (ASTNode node : children) {
+        for (const ASTNode &node : children) {
           if (node->getNodeType() == AST::Declaration ||
               node->getNodeType() == AST::BundleDeclaration) {
             std::shared_ptr<DeclarationNode> decl =
@@ -557,7 +550,7 @@ void CodeResolver::processDeclarations() {
                 }
               }
             }
-            for (auto deleteme : toDelete) {
+            for (const auto &deleteme : toDelete) {
               decl->removeProperty(deleteme);
             }
           } else {
@@ -570,7 +563,7 @@ void CodeResolver::processDeclarations() {
 
 void CodeResolver::expandParallel() {
   std::vector<ASTNode> children = m_tree->getChildren();
-  for (ASTNode node : children) {
+  for (const ASTNode &node : children) {
     ScopeStack scopeStack;
     if (node->getNodeType() == AST::Stream) {
       std::shared_ptr<StreamNode> stream =
@@ -580,7 +573,7 @@ void CodeResolver::expandParallel() {
       // following streams to the right size.
       std::vector<ASTNode> declarations =
           declareUnknownStreamSymbols(stream, nullptr, ScopeStack(), m_tree);
-      for (ASTNode decl : declarations) {
+      for (const ASTNode &decl : declarations) {
         m_tree->addChild(decl);
       }
     }
@@ -635,7 +628,7 @@ void CodeResolver::expandStreamToSizes(std::shared_ptr<StreamNode> stream,
         std::vector<ASTNode> newDeclaration =
             declareUnknownName(std::static_pointer_cast<BlockNode>(right),
                                previousOutSize, scopeStack, m_tree);
-        for (ASTNode decl : newDeclaration) {
+        for (const ASTNode &decl : newDeclaration) {
           m_tree->addChild(decl);
         }
       } else if (numCopies > 1 && right->getNodeType() ==
@@ -670,7 +663,7 @@ ASTNode CodeResolver::expandFunctionFromProperties(
                 // to check the actual input size.
       newFunctions->addChild(func->deepCopy());
     }
-    for (auto prop : props) {
+    for (const auto &prop : props) {
       ASTNode value = prop->getValue();
       int numOuts = CodeAnalysis::getNodeNumOutputs(value, scopeStack, tree);
       if (numOuts != 1 && numOuts != dataSize) {
@@ -685,7 +678,7 @@ ASTNode CodeResolver::expandFunctionFromProperties(
         return nullptr;
       }
       if (numOuts == 1) { // Single value given, duplicate for all copies.
-        for (ASTNode newFunction : newFunctions->getChildren()) {
+        for (const ASTNode &newFunction : newFunctions->getChildren()) {
           std::static_pointer_cast<FunctionNode>(newFunction)
               ->replacePropertyValue(prop->getName(),
                                      prop->getValue()->deepCopy());
@@ -773,24 +766,88 @@ void CodeResolver::processDomains() {
   m_tree->setChildren(new_tree);
 }
 
-void CodeResolver::resolveRates() {
+void CodeResolver::setPortBlockAttributes() {
+  std::vector<ASTNode> children = m_tree->getChildren();
+  // First set null types for port blocks inside modules and resolve streams
+  // in CodeGenerator_
+  for (const ASTNode &node : children) {
+    if (node->getNodeType() == AST::Declaration) {
+      auto decl = std::static_pointer_cast<DeclarationNode>(node);
+      auto typeDecl = ASTQuery::findTypeDeclaration(decl, {}, m_tree);
+      if (ASTQuery::isCodeGenerator(typeDecl)) {
+        setPortBlockAttributesForDeclaration(decl, {}, m_tree);
+        auto blocks = decl->getPropertyValue("blocks");
+        for (const auto &node : blocks->getChildren()) {
+          if (node->getNodeType() == AST::Declaration) {
+            auto decl = std::static_pointer_cast<DeclarationNode>(node);
+            auto typeDecl = ASTQuery::findTypeDeclaration(decl, {}, m_tree);
+            if (ASTQuery::isCodeGenerator(typeDecl)) {
+              setPortBlockAttributesForDeclaration(
+                  decl, {{nullptr, blocks->getChildren()}}, m_tree);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void CodeResolver::resolveAttributes() {
   // FIXME we should repeat this until nothing is left to resolve. There
   // could be complex cases where more than one pass is needed.
+  // Go through backwards to prioritize pull
   std::vector<ASTNode> children = m_tree->getChildren();
-  // First go through backwards to prioritize pull
   std::vector<ASTNode>::reverse_iterator rit = children.rbegin();
+  ASTNode prevNode;
+  // Process streams inside code generators.
+  for (const ASTNode &node : children) {
+    if (node->getNodeType() == AST::Declaration) {
+      auto decl = std::static_pointer_cast<DeclarationNode>(node);
+      auto typeDecl = ASTQuery::findTypeDeclaration(decl, {}, m_tree);
+      if (ASTQuery::isCodeGenerator(typeDecl)) {
+        auto streams = decl->getPropertyValue("streams");
+        auto streamsChildren = streams->getChildren();
+        auto rit = streamsChildren.rbegin();
+        while (rit != streamsChildren.rend()) {
+          ASTNode node = *rit;
+          if (node->getNodeType() == AST::Stream) {
+            resolveStreamTypesReverse(
+                std::static_pointer_cast<StreamNode>(node), {},
+                decl->getPropertyValue("blocks"));
+          }
+          rit++;
+        }
+        if (streams) {
+          for (const auto &streamNode : streams->getChildren()) {
+            if (streamNode->getNodeType() == AST::Stream) {
+              resolveStreamTypesForward(
+                  std::static_pointer_cast<StreamNode>(streamNode), {},
+                  decl->getPropertyValue("blocks"));
+            }
+          }
+        }
+        // FIXME recurse into module declarations inside this module
+        // https://github.com/StrideLang/codegen/issues/1
+      }
+    }
+  }
+
   while (rit != children.rend()) {
     ASTNode node = *rit;
+
     if (node->getNodeType() == AST::Stream) {
-      resolveStreamTypesReverse(std::static_pointer_cast<StreamNode>(node));
+      resolveStreamTypesReverse(std::static_pointer_cast<StreamNode>(node), {},
+                                m_tree);
       resolveStreamRatesReverse(std::static_pointer_cast<StreamNode>(node));
     }
+    prevNode = *rit;
     rit++;
   }
   // Then do it again from the top to try to resolve the rest
   for (const ASTNode &node : children) {
     if (node->getNodeType() == AST::Stream) {
-      resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(node));
+      resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(node), {},
+                                m_tree);
       resolveStreamRates(std::static_pointer_cast<StreamNode>(node));
     }
   }
@@ -800,7 +857,7 @@ void CodeResolver::analyzeConnections() {
   analyzeChildConnections(m_tree);
 
   std::vector<std::shared_ptr<DeclarationNode>> knownDomains;
-  for (ASTNode node : m_tree->getChildren()) {
+  for (const ASTNode &node : m_tree->getChildren()) {
     if (node->getNodeType() == AST::Declaration) {
       std::shared_ptr<DeclarationNode> decl =
           std::static_pointer_cast<DeclarationNode>(node);
@@ -817,16 +874,17 @@ void CodeResolver::analyzeConnections() {
   }
 
   // Now go through the tree to match domain reads and domain writes
-  for (ASTNode node : m_tree->getChildren()) {
+  for (const ASTNode &node : m_tree->getChildren()) {
     if (node->getNodeType() == AST::Declaration) {
       std::shared_ptr<DeclarationNode> decl;
       if (node->getCompilerProperty("reads")) {
-        for (auto domain : node->getCompilerProperty("reads")->getChildren()) {
+        for (const auto &domain :
+             node->getCompilerProperty("reads")->getChildren()) {
           if (domain) {
             if (domain->getNodeType() == AST::String) {
               std::string domainName =
                   std::static_pointer_cast<ValueNode>(domain)->getStringValue();
-              for (auto knownDomain : knownDomains) {
+              for (const auto &knownDomain : knownDomains) {
                 if (domainName == knownDomain->getName()) {
                   decl = knownDomain;
                   break;
@@ -866,12 +924,13 @@ void CodeResolver::analyzeConnections() {
       }
 
       if (node->getCompilerProperty("writes")) {
-        for (auto domain : node->getCompilerProperty("writes")->getChildren()) {
+        for (const auto &domain :
+             node->getCompilerProperty("writes")->getChildren()) {
           if (domain) {
             if (domain->getNodeType() == AST::String) {
               std::string domainName =
                   std::static_pointer_cast<ValueNode>(domain)->getStringValue();
-              for (auto knownDomain : knownDomains) {
+              for (const auto &knownDomain : knownDomains) {
                 if (domainName == knownDomain->getName()) {
                   decl = knownDomain;
                   break;
@@ -924,7 +983,7 @@ void CodeResolver::analyzeParents() {
 }
 
 void CodeResolver::printTree() {
-  for (auto node : m_tree->getChildren()) {
+  for (const auto &node : m_tree->getChildren()) {
     if (node->getNodeType() == AST::Declaration ||
         node->getNodeType() == AST::BundleDeclaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
@@ -971,13 +1030,13 @@ void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,
     if (left == right &&
         (!domainNode ||
          domainNode->getNodeType() ==
-             AST::None)) { // If this is is the last pass then set the unknown
-                           // domains to context domain
+             AST::None)) { // If this is is the last pass then set the
+                           // unknown domains to context domain
       if (left->getNodeType() == AST::Function) {
         // Have functions/loops/reactions be assigned to whatever they are
         // connected to if they are final in a stream.
-        // FIXME we should look inside the modules themselves to see if we can
-        // infer the domain better
+        // FIXME we should look inside the modules themselves to see if we
+        // can infer the domain better
         auto decl = CodeAnalysis::getDeclaration(left);
         if (previousDomain && previousDomain->getNodeType() != AST::None) {
           domainNode = previousDomain;
@@ -992,13 +1051,14 @@ void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,
           previousDomain = contextDomainNode;
         }
       } else {
-        // FIXME This is needed in cases where signals with no set domain are
-        // connected to input ports on other objects. Domains are not
+        // FIXME This is needed in cases where signals with no set domain
+        // are connected to input ports on other objects. Domains are not
         // propagated across secondary ports, but they should be
 
         previousDomain = contextDomainNode;
       }
-      // Unneeded as it gets added in the above call to processDomainsForNode
+      // Unneeded as it gets added in the above call to
+      // processDomainsForNode
       //            domainStack << left;
     }
 
@@ -1027,8 +1087,8 @@ void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,
                       child->getNodeType() == AST::PortProperty) {
                     // Check if expression element has no domain set. If it
                     // doesn't assign to samplingDomain
-                    // TODO this does not cover the case where sampling domain
-                    // is not resolvable at this point.
+                    // TODO this does not cover the case where sampling
+                    // domain is not resolvable at this point.
                     auto domain =
                         CodeAnalysis::getNodeDomain(child, scopeStack, m_tree);
                     if (!domain || domain->getNodeType() == AST::None) {
@@ -1094,7 +1154,7 @@ void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,
 
           if (internalStreams && internalBlocks) {
             internalScopeStack.push_back({func, internalBlocks->getChildren()});
-            for (auto internalStream : internalStreams->getChildren()) {
+            for (const auto &internalStream : internalStreams->getChildren()) {
               assert(internalStream->getNodeType() == AST::Stream);
               if (internalStream->getNodeType() == AST::Stream) {
                 // No context domain as all domains within modules must be
@@ -1109,7 +1169,7 @@ void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,
       }
       // -- Process domains for connected ports
       ASTNode samplingDomainName;
-      for (auto property : func->getProperties()) {
+      for (const auto &property : func->getProperties()) {
         samplingDomainName = processDomainsForNode(
             std::static_pointer_cast<StreamNode>(property->getValue()),
             scopeStack, domainStack);
@@ -1133,7 +1193,8 @@ void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,
       if (left->getNodeType() == AST::Expression ||
           left->getNodeType() == AST::List) {
         //        auto domainNode =
-        //            CodeAnalysis::getNodeDomain(right, scopeStack, m_tree);
+        //            CodeAnalysis::getNodeDomain(right, scopeStack,
+        //            m_tree);
         //        if (!domainNode) {
         //          domainNode = std::make_shared<ValueNode>(__FILE__,
         //          __LINE__);
@@ -1192,7 +1253,7 @@ void CodeResolver::setDomainForNode(ASTNode node, ASTNode domain,
     }
   } else if (node->getNodeType() == AST::List ||
              node->getNodeType() == AST::Expression) {
-    for (ASTNode member : node->getChildren()) {
+    for (const ASTNode &member : node->getChildren()) {
       setDomainForNode(member, domain, scopeStack, tree, force);
     }
   } else if (node->getNodeType() == AST::PortProperty) {
@@ -1300,7 +1361,7 @@ ASTNode CodeResolver::processDomainsForNode(ASTNode node, ScopeStack scopeStack,
         domainStack.push_back(node);
       }
     }
-    for (auto member : func->getProperties()) {
+    for (const auto &member : func->getProperties()) {
       ASTNode propertyDomainName =
           processDomainsForNode(member->getValue(), scopeStack, domainStack);
       if (!propertyDomainName ||
@@ -1313,7 +1374,7 @@ ASTNode CodeResolver::processDomainsForNode(ASTNode node, ScopeStack scopeStack,
   } else if (node->getNodeType() == AST::List) {
     std::vector<ASTNode> listDomainStack;
     ASTNode resolvingInstance;
-    for (ASTNode member : node->getChildren()) {
+    for (const ASTNode &member : node->getChildren()) {
       ASTNode memberDomainName =
           processDomainsForNode(member, scopeStack, domainStack);
 
@@ -1480,8 +1541,8 @@ void CodeResolver::setNodeRate(ASTNode node, double rate, ScopeStack scope,
   }
 }
 
-void CodeResolver::setNodeType(ASTNode node, std::shared_ptr<BlockNode> type,
-                               ScopeStack scope, ASTNode tree) {
+void CodeResolver::setNodeType(ASTNode node, ASTNode type, ScopeStack scope,
+                               ASTNode tree) {
   if (node->getNodeType() == AST::Block) {
     std::shared_ptr<BlockNode> name = std::static_pointer_cast<BlockNode>(node);
     std::shared_ptr<DeclarationNode> declaration =
@@ -1506,9 +1567,8 @@ void CodeResolver::setNodeType(ASTNode node, std::shared_ptr<BlockNode> type,
       }
     }
   } else if (node->getNodeType() == AST::Function) {
-    // assert(0 == 1); // TODO implement
-    // FunctionNode *func = static_cast<FunctionNode *>(node.get());
-    // func->setRate(rate);
+    // Perhaps nothing needs to be done, as the compiler properties showing
+    // connections and port blocks can describe all that's needed
   } else if (node->getNodeType() == AST::List ||
              node->getNodeType() == AST::Expression) {
     for (const ASTNode &element : node->getChildren()) {
@@ -1887,8 +1947,8 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
     if (decl->getObjectType() == "module" ||
         decl->getObjectType() == "reaction" ||
         decl->getObjectType() == "loop") {
-      // First insert and resolve input and output domains for main ports. The
-      // input port takes the output domain if undefined.
+      // First insert and resolve input and output domains for main ports.
+      // The input port takes the output domain if undefined.
 
       ASTNode internalBlocks = decl->getPropertyValue("blocks");
       if (!internalBlocks || internalBlocks->getNodeType() !=
@@ -1908,7 +1968,8 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
         auto outputDomain = std::make_shared<PortPropertyNode>(
             outputPortBlock->getName(), "domain", __FILE__, __LINE__);
         mainPortsDefaultDomain = outputDomain;
-        // First give port a block and its declaration if it doesn't have one.
+        // First give port a block and its declaration if it doesn't have
+        // one.
         if (!portBlock || portBlock->getNodeType() == AST::None) {
           std::string possibleName = "Output";
           auto outputDecl = ASTQuery::findDeclarationByName(
@@ -1964,7 +2025,8 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
                                        // here
           mainPortsDefaultDomain = inputDomain;
         }
-        // First give port a block and its declaration if it doesn't have one.
+        // First give port a block and its declaration if it doesn't have
+        // one.
         if (!portBlock || portBlock->getNodeType() == AST::None) {
           std::string possibleName = "Input";
           auto inputDecl = ASTQuery::findDeclarationByName(
@@ -2030,8 +2092,8 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
               portDeclaration->getName(), "rate", __FILE__, __LINE__);
 
           if (blockPortValue) {
-            //                        // Now do auto declaration of IO blocks
-            //                        if not declared.
+            //                        // Now do auto declaration of IO
+            //                        blocks if not declared.
             assert(blockPortValue->getNodeType() == AST::Block ||
                    blockPortValue->getNodeType() ==
                        AST::None); // Catch on debug but fail gracefully on
@@ -2135,8 +2197,8 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
 }
 
 void CodeResolver::resolveStreamSymbols() {
-  // FIMXE we need to resolve the streams in the root tree in reverse order as
-  // we do for streams within modules.
+  // FIMXE we need to resolve the streams in the root tree in reverse order
+  // as we do for streams within modules.
   for (ASTNode node : m_tree->getChildren()) {
     if (node->getNodeType() == AST::Stream) {
       std::shared_ptr<StreamNode> stream =
@@ -2151,8 +2213,8 @@ void CodeResolver::resolveStreamSymbols() {
     } else if (node->getNodeType() == AST::Declaration) {
       std::shared_ptr<DeclarationNode> decl =
           std::static_pointer_cast<DeclarationNode>(node);
-      // "module", "loop" and "reaction" inherit from _CodeGenerator. The user
-      // can also inherit from _CodeGenerator to force parsing and code
+      // "module", "loop" and "reaction" inherit from _CodeGenerator. The
+      // user can also inherit from _CodeGenerator to force parsing and code
       // resolution for streams and blocks in their types
       ScopeStack scope;
       auto typeDecl = ASTQuery::findTypeDeclarationByName(decl->getObjectType(),
@@ -2247,6 +2309,65 @@ void CodeResolver::resolveConstants() {
 void CodeResolver::resolvePortProperties() {
   for (const auto &node : m_tree->getChildren()) {
     resolveNodeSymbols(node, ScopeStack(), m_tree);
+  }
+}
+
+void CodeResolver::setPortBlockAttributesForDeclaration(
+    std::shared_ptr<DeclarationNode> decl, ScopeStack stack, ASTNode tree) {
+
+  auto inputPortBlock = ASTQuery::getModuleMainInputPortBlock(decl);
+  if (inputPortBlock) {
+    auto portBlockNode = inputPortBlock->getPropertyValue("block");
+    // TODO allow other options apart from block
+    if (portBlockNode && portBlockNode->getNodeType() == AST::Block) {
+      auto block = std::static_pointer_cast<BlockNode>(portBlockNode);
+
+      auto blockDecl = ASTQuery::findDeclarationByName(
+          block->getName(), {}, decl->getPropertyValue("blocks"));
+      if (blockDecl) {
+        auto type = blockDecl->getPropertyValue("type");
+        if (!type || type->getNodeType() == AST::None) {
+          auto newType = std::make_shared<PortPropertyNode>(
+              inputPortBlock->getName(), "type", __FILE__, __LINE__);
+          blockDecl->setPropertyValue("type", newType);
+        }
+        auto rate = blockDecl->getPropertyValue("rate");
+        if (!rate || type->getNodeType() == AST::None ||
+            (rate->getNodeType() == AST::Int &&
+             std::static_pointer_cast<ValueNode>(rate)->getIntValue() < 0)) {
+          auto newRate = std::make_shared<PortPropertyNode>(
+              inputPortBlock->getName(), "rate", __FILE__, __LINE__);
+          blockDecl->setPropertyValue("rate", newRate);
+        }
+      }
+    }
+  }
+  auto outputPortBlock = ASTQuery::getModuleMainOutputPortBlock(decl);
+  if (outputPortBlock) {
+    auto portBlockNode = outputPortBlock->getPropertyValue("block");
+    // TODO allow other options apart from block
+    if (portBlockNode && portBlockNode->getNodeType() == AST::Block) {
+      auto block = std::static_pointer_cast<BlockNode>(portBlockNode);
+
+      auto blockDecl = ASTQuery::findDeclarationByName(
+          block->getName(), {}, decl->getPropertyValue("blocks"));
+      if (blockDecl) {
+        auto type = blockDecl->getPropertyValue("type");
+        if (!type || type->getNodeType() == AST::None) {
+          auto newType = std::make_shared<PortPropertyNode>(
+              outputPortBlock->getName(), "type", __FILE__, __LINE__);
+          blockDecl->setPropertyValue("type", newType);
+        }
+        auto rate = blockDecl->getPropertyValue("rate");
+        if (!rate || rate->getNodeType() == AST::None ||
+            (rate->getNodeType() == AST::Int &&
+             std::static_pointer_cast<ValueNode>(rate)->getIntValue() < 0)) {
+          auto newRate = std::make_shared<PortPropertyNode>(
+              outputPortBlock->getName(), "rate", __FILE__, __LINE__);
+          blockDecl->setPropertyValue("rate", newRate);
+        }
+      }
+    }
   }
 }
 
@@ -2579,8 +2700,9 @@ ASTNode CodeResolver::getModuleContextDomain(
 //        if (!nodeDomain || nodeDomain->getNodeType() == AST::None) {
 //          decl->setDomainString(domainDeclaration->getName());
 //          if (CodeAnalysis::getNodeRate(decl, ScopeStack(), m_tree) < 0) {
-//            ASTNode rateValue = domainDeclaration->getPropertyValue("rate");
-//            if (rateValue->getNodeType() == AST::Int ||
+//            ASTNode rateValue =
+//            domainDeclaration->getPropertyValue("rate"); if
+//            (rateValue->getNodeType() == AST::Int ||
 //                rateValue->getNodeType() == AST::Real) {
 //              double rate = static_cast<ValueNode
 //              *>(rateValue.get())->toReal();
@@ -2588,7 +2710,8 @@ ASTNode CodeResolver::getModuleContextDomain(
 //            } else if (rateValue->getNodeType() == AST::PortProperty) {
 //              decl->replacePropertyValue("rate", rateValue->deepCopy());
 //            } else {
-//              std::cerr << "Unexpected type for rate in domain declaration:
+//              std::cerr << "Unexpected type for rate in domain
+//              declaration:
 //              "
 //                       <<
 //                       QString::fromStdString(domainDeclaration->getName());
@@ -2597,9 +2720,11 @@ ASTNode CodeResolver::getModuleContextDomain(
 //        }
 //      }
 //    } else if (node->getNodeType() == AST::Stream) {
-//      // We need to go through setting the domain for functions in stream as
+//      // We need to go through setting the domain for functions in stream
+//      as
 //      // they are the instances
-//      //            setContextDomainForStreamNode(node, domainDeclaration);
+//      //            setContextDomainForStreamNode(node,
+//      domainDeclaration);
 //    }
 //  }
 //}
@@ -2609,13 +2734,15 @@ ASTNode CodeResolver::getModuleContextDomain(
 //{
 //    if (node->getNodeType() == AST::Stream) {
 //        auto stream = static_pointer_cast<StreamNode>(node);
-//        setContextDomainForStreamNode(stream->getLeft(), domainDeclaration);
+//        setContextDomainForStreamNode(stream->getLeft(),
+//        domainDeclaration);
 //        setContextDomainForStreamNode(stream->getRight(),
 //        domainDeclaration);
 //    } else if (node->getNodeType() == AST::Function) {
 //        auto func = static_pointer_cast<FunctionNode>(node);
 //        auto domainProperty = func->getPropertyValue("domain");
-//        if (!domainProperty || domainProperty->getNodeType() ==AST::None) {
+//        if (!domainProperty || domainProperty->getNodeType() ==AST::None)
+//        {
 //            func->setPropertyValue("domain",
 //            make_shared<ValueNode>(domainDeclaration->getName(), __FILE__,
 //            __LINE__));
@@ -2636,8 +2763,8 @@ ASTNode CodeResolver::getModuleContextDomain(
 //                for (auto block: blocks->getChildren()) {
 //                    if (block->getNodeType() == AST::Declaration) {
 //                        auto internalDecl =
-//                        std::static_pointer_cast<DeclarationNode>(block); if
-//                        (internalDecl->getName() == "_ContextDomain") {
+//                        std::static_pointer_cast<DeclarationNode>(block);
+//                        if (internalDecl->getName() == "_ContextDomain") {
 //                            hasContextDomain = true;
 //                            break;
 //                        }
@@ -2695,7 +2822,8 @@ ASTNode CodeResolver::getModuleContextDomain(
 //                        }
 //                    }
 //                }
-//// populateContextDomains(decl->getPropertyValue("blocks")->getChildren()) ;
+//// populateContextDomains(decl->getPropertyValue("blocks")->getChildren())
+///;
 ///// Do it recursively
 //            }
 //        }
@@ -2741,9 +2869,9 @@ void CodeResolver::resolveDomainForStreamNode(ASTNode node,
   //  if (domain) {
   //    std::shared_ptr<DeclarationNode> domainDeclaration;
   //    if (domain->getNodeType() == AST::PortProperty) {
-  //      auto domainNameNode = static_pointer_cast<PortPropertyNode>(domain);
-  //      domain = resolvePortProperty(domainNameNode, scopeStack);
-  //      if (!domain) {
+  //      auto domainNameNode =
+  //      static_pointer_cast<PortPropertyNode>(domain); domain =
+  //      resolvePortProperty(domainNameNode, scopeStack); if (!domain) {
   //        domain = domainNameNode;
   //      }
   //    }
@@ -3360,8 +3488,6 @@ void CodeResolver::markConnectionForNode(ASTNode node, ScopeStack scopeStack,
         nodeWritesProperties =
             std::make_shared<ListNode>(nullptr, __FILE__, __LINE__);
         nodeInstance->setCompilerProperty("writes", nodeWritesProperties);
-      } else {
-        //        std::cerr << "WARNING: node already has write properties.";
       }
 
       bool alreadyInWrites = false;
@@ -3393,6 +3519,12 @@ void CodeResolver::markConnectionForNode(ASTNode node, ScopeStack scopeStack,
       }
       if (!alreadyInWrites && newWriteDomain) {
         nodeWritesProperties->addChild(newWriteDomain);
+      }
+      if (previous) {
+        node->setCompilerProperty("mainInput", previous);
+        previous->setCompilerProperty("mainOutput", node);
+        // TODO Add compiler property for function ports
+        // https://github.com/StrideLang/codegen/issues/2
       }
     }
 
@@ -3560,15 +3692,15 @@ void CodeResolver::markConnectionForNode(ASTNode node, ScopeStack scopeStack,
             markPreviousReads(node, child, scopeStack);
           }
         } else if (previous->getNodeType() == AST::Function) {
-          // FIXME assumes the output port of the module takes the output port
-          // domain
+          // FIXME assumes the output port of the module takes the output
+          // port domain
           writesProperties->addChild(decl->getDomain());
         } else if (previous->getNodeType() == AST::Int ||
                    previous->getNodeType() == AST::Real ||
                    previous->getNodeType() == AST::Switch ||
                    previous->getNodeType() == AST::String) {
-          // FIXME constant writes should be moved to the init domain related
-          // to the signal's declared domain.
+          // FIXME constant writes should be moved to the init domain
+          // related to the signal's declared domain.
           writesProperties->addChild(decl->getDomain());
         }
       }
@@ -3577,8 +3709,9 @@ void CodeResolver::markConnectionForNode(ASTNode node, ScopeStack scopeStack,
              node->getNodeType() == AST::Real ||
              node->getNodeType() == AST::Switch ||
              node->getNodeType() == AST::String) {
-    //        // First create read and write compiler properties for the node
-    //        if not there std::shared_ptr<ListNode> nodeReadsProperties =
+    //        // First create read and write compiler properties for the
+    //        node if not there std::shared_ptr<ListNode>
+    //        nodeReadsProperties =
     //        static_pointer_cast<ListNode>(node->getCompilerProperty("reads"));
     //        if (!nodeReadsProperties) {
     //            nodeReadsProperties = std::make_shared<ListNode>(nullptr,
