@@ -136,7 +136,7 @@ public:
   getDataTypeForSignalDeclaration(std::shared_ptr<DeclarationNode> decl);
   static std::string
   getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
-                            ScopeStack scope, ASTNode tree);
+                            const ScopeStack &scope, ASTNode tree);
 
   static std::string resolveBundleDataType(BundleNode *bundle,
                                            ScopeStack scopeStack, ASTNode tree);
@@ -154,6 +154,8 @@ public:
   static std::string resolvePortPropertyDataType(PortPropertyNode *portproperty,
                                                  ScopeStack scopeStack,
                                                  ASTNode tree);
+
+  static std::vector<ASTNode> getDomainIOBlockDeclarations(ASTNode tree);
 };
 } // namespace strd
 

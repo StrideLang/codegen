@@ -10,13 +10,12 @@ module PassThroughForward {
         }
     ]
     blocks: [
-        signal Input { type: InputPort.type rate: InputPort.rate}
-        signal Output { type: InputPort.type rate: InputPort.rate}
+        signal Input { type: InputPort.type}
+        signal Output { type: InputPort.type}
     ]
     streams: [
         Input >> Output;
     ]
-    meta: "Pass attributes from input"
 }
 
 signal ForwardModuleIn {}
@@ -24,7 +23,7 @@ signal ForwardModuleOut {}
 signal ForwardModuleInInt { type: _IntType}
 signal ForwardModuleOutInt { type: _IntType}
 signal ForwardModuleOutResolved {}
-signal ForwardModuleInNotResolved {}
+signal ForwardModuleInResolved {}
 
 ForwardModuleIn >> PassThroughForward() >> ForwardModuleOut; # nothing should be resolved here
 ForwardModuleInInt >> PassThroughForward() >> ForwardModuleOutResolved; # forward resolve
@@ -48,7 +47,6 @@ module PassThrough {
     streams: [
         Input >> Output;
     ]
-    meta: "Pass attributes from output"
 }
 
 signal ModuleIn {}

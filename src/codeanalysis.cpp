@@ -1823,6 +1823,11 @@ ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
         // For now only resolve types for signals, perhaps in the future resolve
         // from all declarations that inherit from "Typed"
         return getDataTypeForSignalDeclaration(decl);
+      }
+      if (decl->getObjectType() == "switch" ||
+          decl->getObjectType() == "trigger") {
+        return std::make_shared<BlockNode>(
+            getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__);
       } else {
         std::cerr << " Could not find type property in:" << decl->toText()
                   << std::endl;
@@ -2032,7 +2037,7 @@ ASTNode CodeAnalysis::getDataTypeForSignalDeclaration(
 
 std::string
 CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
-                                        ScopeStack scope, ASTNode tree) {
+                                        const ScopeStack &scope, ASTNode tree) {
   if (decl->getObjectType() == "signal") {
     auto typeNode = getDataTypeForSignalDeclaration(decl);
     if (typeNode) {
@@ -2230,4 +2235,54 @@ CodeAnalysis::resolvePortPropertyDataType(PortPropertyNode *portproperty,
     return "_RealType";
   }
   return "_RealType";
+}
+
+std::vector<ASTNode> CodeAnalysis::getDomainIOBlockDeclarations(ASTNode tree) {
+  std::vector<ASTNode> decls;
+  // Add domain external signals to root scope
+  // The must be added before code resolver so they are available.
+  for (const auto &node : tree->getChildren()) {
+    if (node->getNodeType() == AST::Declaration) {
+      auto decl = std::static_pointer_cast<DeclarationNode>(node);
+      if (decl->getObjectType() == "_domainDefinition") {
+        auto inputsNode = decl->getPropertyValue("inputs");
+        if (inputsNode) {
+          for (const auto &inputNode : inputsNode->getChildren()) {
+            if (inputNode->getNodeType() == AST::Declaration ||
+                inputNode->getNodeType() == AST::BundleDeclaration) {
+              auto inputDecl =
+                  std::static_pointer_cast<DeclarationNode>(inputNode);
+              if (inputDecl->getObjectType() == "signal" ||
+                  inputDecl->getObjectType() == "switch") {
+                decls.push_back(inputNode);
+              } else {
+                std::cerr << "ERROR unexptected declaration for domain input "
+                             "declaration:"
+                          << AST::toText(inputNode) << std::endl;
+              }
+            }
+          }
+        }
+        auto outputsNode = decl->getPropertyValue("outputs");
+        if (outputsNode) {
+          for (const auto &outputNode : outputsNode->getChildren()) {
+            if (outputNode->getNodeType() == AST::Declaration ||
+                outputNode->getNodeType() == AST::BundleDeclaration) {
+              auto inputDecl =
+                  std::static_pointer_cast<DeclarationNode>(outputNode);
+              if (inputDecl->getObjectType() == "signal" ||
+                  inputDecl->getObjectType() == "switch") {
+                decls.push_back(outputNode);
+              } else {
+                std::cerr << "ERROR unexptected declaration for domain output "
+                             "declaration:"
+                          << AST::toText(outputNode) << std::endl;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return decls;
 }

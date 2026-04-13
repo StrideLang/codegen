@@ -79,6 +79,11 @@ CodeResolver::~CodeResolver() {}
 
 void CodeResolver::process() {
   processSystem();
+  // insert domain IO blocks
+  auto ioBlocks = strd::CodeAnalysis::getDomainIOBlockDeclarations(m_tree);
+  for (const auto &block : ioBlocks) {
+    m_tree->addChild(block);
+  }
   // Insert objects
   ASTFunctions::insertRequiredObjects(m_tree, m_system->getImportTrees());
   ASTFunctions::fillDefaultProperties(m_tree);
@@ -762,7 +767,6 @@ void CodeResolver::processDomains() {
       new_tree.push_back(node);
     }
   }
-
   m_tree->setChildren(new_tree);
 }
 
@@ -2330,6 +2334,7 @@ void CodeResolver::setPortBlockAttributesForDeclaration(
           auto newType = std::make_shared<PortPropertyNode>(
               inputPortBlock->getName(), "type", __FILE__, __LINE__);
           blockDecl->setPropertyValue("type", newType);
+          type = newType;
         }
         auto rate = blockDecl->getPropertyValue("rate");
         if (!rate || type->getNodeType() == AST::None ||
