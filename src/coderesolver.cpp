@@ -272,52 +272,53 @@ void CodeResolver::resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
                                              ScopeStack stack, ASTNode tree) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
-  auto type = CodeAnalysis::getOutputDataType(left, stack, tree);
-  ASTNode rightType;
+  auto types = CodeAnalysis::getOutputDataTypes(left, stack, tree);
+  std::vector<ASTNode> rightTypes;
   if (right->getNodeType() == AST::Stream) {
     resolveStreamTypesReverse(std::static_pointer_cast<StreamNode>(right),
                               stack, tree);
-    rightType = CodeAnalysis::getInputDataType(
+    rightTypes = CodeAnalysis::getInputDataTypes(
         std::static_pointer_cast<StreamNode>(right)->getLeft(), stack, tree);
   } else {
-    rightType = CodeAnalysis::getInputDataType(right, stack, tree);
+    rightTypes = CodeAnalysis::getInputDataTypes(right, stack, tree);
   }
-  if (rightType && (!type || type->getNodeType() != AST::None)) {
-    if (rightType->getNodeType() == AST::PortProperty) {
-      CodeResolver::setNodeType(left, rightType, stack, tree);
-    } else {
-      CodeResolver::setNodeType(left, rightType, stack, tree);
+  if (rightTypes.size() == types.size()) {
+    for (int i = 0; i < rightTypes.size(); i++) {
+      if (rightTypes[i] && rightTypes[i]->getNodeType() == AST::None) {
+        CodeResolver::setNodeType(left, rightTypes[i], stack, tree);
+      }
     }
   }
 }
 
 void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
-                                             ScopeStack stack, ASTNode tree) {
+                                             ScopeStack scope, ASTNode tree) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
-  auto type = CodeAnalysis::getOutputDataType(left, {}, m_tree);
-  if (type == nullptr || type->getNodeType() == AST::None) {
-    if (right->getNodeType() == AST::Stream) {
-      // left node can't provide type, so keep resolving for rest of stream node
-      resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right), {},
-                                tree);
-    }
-    return;
-  }
-  ASTNode rightType;
+  auto types = CodeAnalysis::getOutputDataTypes(left, {}, m_tree);
+
   if (right->getNodeType() == AST::Stream) {
-    rightType = CodeAnalysis::getInputDataType(
-        std::static_pointer_cast<StreamNode>(right)->getLeft(), {}, m_tree);
-    if (rightType == nullptr || rightType->getNodeType() == AST::None) {
-      CodeResolver::setNodeType(
-          static_cast<StreamNode *>(right.get())->getLeft(), type, {}, m_tree);
+    auto rightTypes = CodeAnalysis::getInputDataTypes(
+        std::static_pointer_cast<StreamNode>(right)->getLeft(), scope, tree);
+    if (rightTypes.size() == types.size()) {
+      for (int i = 0; i < rightTypes.size(); i++) {
+        if (!rightTypes[i] || rightTypes[i]->getNodeType() == AST::None) {
+          CodeResolver::setNodeType(
+              static_cast<StreamNode *>(right.get())->getLeft(), types[i],
+              scope, tree);
+        }
+      }
     }
-    resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right), {},
-                              tree);
+    resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right),
+                              scope, tree);
   } else {
-    rightType = CodeAnalysis::getInputDataType(right, {}, m_tree);
-    if (rightType == nullptr || rightType->getNodeType() == AST::None) {
-      CodeResolver::setNodeType(right, type, {}, m_tree);
+    auto rightTypes = CodeAnalysis::getInputDataTypes(right, scope, tree);
+    if (right->getChildren().size() == types.size() &&
+        rightTypes.size() == types.size()) {
+      for (int i = 0; i < rightTypes.size(); i++) {
+        CodeResolver::setNodeType(right->getChildren()[i], types[i], scope,
+                                  tree);
+      }
     }
   }
 }
@@ -1589,6 +1590,8 @@ void CodeResolver::setNodeType(ASTNode node, ASTNode type, ScopeStack scope,
 std::vector<ASTNode>
 CodeResolver::declareUnknownName(std::shared_ptr<BlockNode> block, int size,
                                  ScopeStack localScope, ASTNode tree) {
+  // TODO store found declarations in compiler property.
+  // https://github.com/StrideLang/strideutils/issues/1
   std::vector<ASTNode> declarations;
   std::shared_ptr<DeclarationNode> decl = ASTQuery::findDeclarationByName(
       block->getName(), localScope, tree, block->getNamespaceList());
@@ -3529,6 +3532,7 @@ void CodeResolver::markConnectionForNode(ASTNode node, ScopeStack scopeStack,
         node->setCompilerProperty("mainInput", previous);
         previous->setCompilerProperty("mainOutput", node);
         // TODO Add compiler property for function ports
+        // Check duplication of "mainOutput" and "outputBlock"
         // https://github.com/StrideLang/codegen/issues/2
       }
     }
@@ -3791,6 +3795,7 @@ void CodeResolver::storeDeclarationsForNode(ASTNode node, ScopeStack scopeStack,
     auto decl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
                                                 scopeStack, tree);
     if (decl && decl->getObjectType() != "platformModule") {
+      // TODO Verify first if property already exists.
       node->setCompilerProperty("declaration", decl);
     }
   } else if (node->getNodeType() == AST::Expression ||

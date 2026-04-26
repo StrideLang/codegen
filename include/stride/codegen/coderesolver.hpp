@@ -92,7 +92,7 @@ private:
   void resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
                                  ScopeStack stack, ASTNode tree);
   void resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
-                                 ScopeStack stack, ASTNode tree);
+                                 ScopeStack scope, ASTNode tree);
 
   void expandParallelStream(std::shared_ptr<StreamNode> stream,
                             ScopeStack scopeStack, ASTNode tree);

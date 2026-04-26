@@ -21,6 +21,7 @@ set(TEST_SOURCES
   main.cpp
   resolver.cpp
   compiler_properties.cpp
+  codeanalysis_tests.cpp
 )
 
 

@@ -128,9 +128,9 @@ public:
   static std::shared_ptr<DeclarationNode>
   findDataTypeDeclaration(std::string dataTypeName, ASTNode tree);
 
-  static ASTNode getInputDataType(ASTNode node, const ScopeStack &scope,
-                                  ASTNode tree);
-  static ASTNode getOutputDataType(ASTNode node, const ScopeStack &scope,
+  static std::vector<ASTNode>
+  getInputDataTypes(ASTNode node, const ScopeStack &scope, ASTNode tree);
+  static std::vector<ASTNode> getOutputDataTypes(ASTNode node, const ScopeStack &scope,
                                    ASTNode tree);
   static ASTNode
   getDataTypeForSignalDeclaration(std::shared_ptr<DeclarationNode> decl);

@@ -1411,10 +1411,7 @@ int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
           << std::endl;
       return 1;
     }
-  } else if (node->getNodeType() == AST::BundleDeclaration) {
-    return ASTQuery::getBlockDeclaredSize(
-        std::static_pointer_cast<DeclarationNode>(node), scope, tree, errors);
-  } else if (node->getNodeType() == AST::BundleDeclaration) {
+  } else if (node->getNodeType() == AST::Declaration) {
     return ASTQuery::getBlockDeclaredSize(
         std::static_pointer_cast<DeclarationNode>(node), scope, tree, errors);
   }
@@ -1650,7 +1647,7 @@ int CodeAnalysis::getFunctionDataSize(std::shared_ptr<FunctionNode> func,
     return 1;
   }
   int size = 1;
-  for (std::shared_ptr<PropertyNode> port : ports) {
+  for (const std::shared_ptr<PropertyNode> &port : ports) {
     ASTNode value = port->getValue();
     // FIXME need to decide the size by also looking at the port block size
     int newSize = CodeAnalysis::getNodeNumOutputs(value, scope, tree, errors);
@@ -1658,7 +1655,8 @@ int CodeAnalysis::getFunctionDataSize(std::shared_ptr<FunctionNode> func,
                                                 func->getNamespaceList());
     if (decl && decl->getPropertyValue("ports")) {
       std::shared_ptr<DeclarationNode> declaredPort;
-      for (auto portDecl : decl->getPropertyValue("ports")->getChildren()) {
+      for (const auto &portDecl :
+           decl->getPropertyValue("ports")->getChildren()) {
         if (portDecl->getNodeType() == AST::Declaration) {
           auto nameNode = std::static_pointer_cast<DeclarationNode>(portDecl)
                               ->getPropertyValue("name");
@@ -1811,8 +1809,9 @@ CodeAnalysis::findDataTypeDeclaration(std::string dataTypeName, ASTNode tree) {
   return nullptr;
 }
 
-ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
-                                       ASTNode tree) {
+std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
+                                                     const ScopeStack &scope,
+                                                     ASTNode tree) {
   // TODO identify signal and module from inheritance
   // TODO support bundle
   if (node->getNodeType() == AST::Block) {
@@ -1822,12 +1821,12 @@ ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
       if (decl->getObjectType() == "signal") {
         // For now only resolve types for signals, perhaps in the future resolve
         // from all declarations that inherit from "Typed"
-        return getDataTypeForSignalDeclaration(decl);
+        return {getDataTypeForSignalDeclaration(decl)};
       }
       if (decl->getObjectType() == "switch" ||
           decl->getObjectType() == "trigger") {
-        return std::make_shared<BlockNode>(
-            getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__);
+        return {std::make_shared<BlockNode>(
+            getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       } else {
         std::cerr << " Could not find type property in:" << decl->toText()
                   << std::endl;
@@ -1843,7 +1842,7 @@ ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
       if (decl->getObjectType() == "signal") {
         // For now only resolve types for signals, perhaps in the future
         // resolve from all declarations that inherit from "Typed"
-        return getDataTypeForSignalDeclaration(decl);
+        return {getDataTypeForSignalDeclaration(decl)};
       }
     } else {
       std::cerr << " Could not find node declaration for " << bundle->getName()
@@ -1854,7 +1853,7 @@ ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
     auto funcDecl =
         ASTQuery::findDeclarationByName(func->getName(), scope, tree);
     if (!funcDecl) {
-      return nullptr;
+      return {};
     }
     // first check if input block in module has a defined type
     auto inputPortBlock = ASTQuery::getModuleMainInputPortBlock(funcDecl);
@@ -1877,9 +1876,9 @@ ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
                       connected->getCompilerProperty("declaration");
                   if (connectedDecl &&
                       connectedDecl->getNodeType() == AST::Declaration) {
-                    return std::static_pointer_cast<DeclarationNode>(
-                               connectedDecl)
-                        ->getPropertyValue("type");
+                    return {
+                        std::static_pointer_cast<DeclarationNode>(connectedDecl)
+                            ->getPropertyValue("type")};
                   }
                 }
               } else {
@@ -1892,15 +1891,15 @@ ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
                       outputPortBlock->getName()) {
                     auto connected = func->getCompilerProperty("mainOutput");
                     if (connected) {
-                      return getInputDataType(connected, scope, tree);
+                      return getInputDataTypes(connected, scope, tree);
                     } else {
-                      return nullptr;
+                      return {};
                     }
                   }
                 }
               }
             } else {
-              return dataType;
+              return {dataType};
             }
           }
         }
@@ -1915,13 +1914,14 @@ ASTNode CodeAnalysis::getInputDataType(ASTNode node, const ScopeStack &scope,
     // and the connection to the outer output block
 
     // TODO implement
-    return nullptr;
+    return {};
   }
-  return nullptr;
+  return {};
 }
 
-ASTNode CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
-                                        ASTNode tree) {
+std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
+                                                      const ScopeStack &scope,
+                                                      ASTNode tree) {
   // TODO identify signal and module from inheritance
   // TODO support bundle
   if (node->getNodeType() == AST::Block) {
@@ -1929,9 +1929,9 @@ ASTNode CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
     auto decl = ASTQuery::findDeclarationByName(block->getName(), scope, tree);
     if (decl) {
       if (decl->getObjectType() == "signal") {
-        // For now only resolve types for signals, perhaps in the future
-        // resolve from all declarations that inherit from "Typed"
-        return getDataTypeForSignalDeclaration(decl);
+        return {getDataTypeForSignalDeclaration(decl)};
+      } else if (decl->getObjectType() == "switch") {
+        return {getDataTypeForSignalDeclaration(decl)};
       }
     } else {
       std::cerr << " Could not find node declaration for " << block->getName()
@@ -1944,7 +1944,7 @@ ASTNode CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
       if (decl->getObjectType() == "signal") {
         // For now only resolve types for signals, perhaps in the future
         // resolve from all declarations that inherit from "Typed"
-        return getDataTypeForSignalDeclaration(decl);
+        return {getDataTypeForSignalDeclaration(decl)};
       }
     } else {
       std::cerr << " Could not find node declaration for " << bundle->getName()
@@ -1955,7 +1955,7 @@ ASTNode CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
     auto funcDecl =
         ASTQuery::findDeclarationByName(func->getName(), scope, tree);
     if (!funcDecl) {
-      return nullptr;
+      return {};
     }
     // first check if output block in module has a defined type
     // then check connected blocks agains port block definitions
@@ -1979,9 +1979,9 @@ ASTNode CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
                       connected->getCompilerProperty("declaration");
                   if (connectedDecl &&
                       connectedDecl->getNodeType() == AST::Declaration) {
-                    return std::static_pointer_cast<DeclarationNode>(
-                               connectedDecl)
-                        ->getPropertyValue("type");
+                    return {
+                        std::static_pointer_cast<DeclarationNode>(connectedDecl)
+                            ->getPropertyValue("type")};
                   }
                 }
               } else {
@@ -1994,22 +1994,28 @@ ASTNode CodeAnalysis::getOutputDataType(ASTNode node, const ScopeStack &scope,
                       inputPortBlock->getName()) {
                     auto connected = func->getCompilerProperty("mainInput");
                     if (connected) {
-                      return getOutputDataType(connected, scope, tree);
+                      return getOutputDataTypes(connected, scope, tree);
                     } else {
-                      return nullptr;
+                      return {};
                     }
                   }
                 }
               }
             } else {
-              return dataType;
+              return {dataType};
             }
           }
         }
       }
     }
+  } else if (node->getNodeType() == AST::Int ||
+             node->getNodeType() == AST::Real) {
+    // TODO get this from the library
+    auto typeName = resolveNodeOutDataType(node, scope, tree);
+    return {std::make_shared<BlockNode>(typeName, __FILE__, __LINE__)};
   }
-  return nullptr;
+  // TODO string literal
+  return {};
 }
 
 ASTNode CodeAnalysis::getDataTypeForSignalDeclaration(
