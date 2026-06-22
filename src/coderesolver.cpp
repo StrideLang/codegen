@@ -34,7 +34,7 @@
 
 #include "stride/codegen/codeanalysis.hpp"
 #include "stride/codegen/codevalidator.hpp"
-//#include "stride/codegen/stridesystem.hpp"
+// #include "stride/codegen/stridesystem.hpp"
 #include "stride/codegen/coderesolver.hpp"
 
 #include "stride/utils/astfunctions.h"
@@ -259,8 +259,10 @@ void CodeResolver::resolveStreamRates(std::shared_ptr<StreamNode> stream) {
             CodeResolver::setNodeRate(right, defaultRate, {}, m_tree);
 
           } else {
-            std::cout << __FILE__ << ":" << __LINE__
-                      << " ERROR: can't find domain declaration" << std::endl;
+            std::cout
+                << __FILE__ << ":" << __LINE__
+                << " ERROR: can't find domain declaration to set rate for "
+                << right->toText() << std::endl;
           }
         }
       }
@@ -295,7 +297,7 @@ void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
                                              ScopeStack scope, ASTNode tree) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
-  auto types = CodeAnalysis::getOutputDataTypes(left, {}, m_tree);
+  auto types = CodeAnalysis::getOutputDataTypes(left, scope, tree);
 
   if (right->getNodeType() == AST::Stream) {
     auto rightTypes = CodeAnalysis::getInputDataTypes(
@@ -1810,85 +1812,89 @@ CodeResolver::declareUnknownStreamSymbols(std::shared_ptr<StreamNode> stream,
                                           ASTNode previousStreamMember,
                                           ScopeStack localScope, ASTNode tree) {
   std::vector<ASTNode> newDeclarations;
-  ASTNode left = stream->getLeft();
-  ASTNode right = stream->getRight();
 
-  ASTNode nextStreamMember;
-  if (right->getNodeType() != AST::Stream) {
-    nextStreamMember = right;
-  } else {
-    nextStreamMember = std::static_pointer_cast<StreamNode>(right)->getLeft();
-  }
+  if (m_declareUnknownSymbols) {
+    ASTNode left = stream->getLeft();
+    ASTNode right = stream->getRight();
 
-  if (left->getNodeType() == AST::Block) {
-    std::shared_ptr<BlockNode> name = std::static_pointer_cast<BlockNode>(left);
-    int size = -1;
-    if (previousStreamMember) {
-      size = CodeAnalysis::getNodeNumOutputs(previousStreamMember, localScope,
-                                             m_tree);
-    }
-    if (size <= 0 && previousStreamMember) { // Look to the right if can't
-                                             // resolve from the left
-      // Size for first member should always be 1
-      size =
-          CodeAnalysis::getNodeNumInputs(nextStreamMember, localScope, m_tree);
-    }
-    if (size <= 0) { // None of the elements in the stream have size
-      size = 1;
-    }
-    std::vector<ASTNode> declarations =
-        declareUnknownName(name, size, localScope, tree);
-    newDeclarations.insert(newDeclarations.end(), declarations.begin(),
-                           declarations.end());
-  } else if (left->getNodeType() == AST::Expression) {
-    int size = 1; // FIXME implement size detection for expressions
-    std::shared_ptr<ExpressionNode> expr =
-        std::static_pointer_cast<ExpressionNode>(left);
-    std::vector<ASTNode> declarations =
-        declareUnknownExpressionSymbols(expr, size, localScope, tree);
-    newDeclarations.insert(newDeclarations.end(), declarations.begin(),
-                           declarations.end());
-  } else if (left->getNodeType() == AST::Function) {
-    std::shared_ptr<FunctionNode> func =
-        std::static_pointer_cast<FunctionNode>(left);
-    std::vector<ASTNode> declarations =
-        declareUnknownFunctionSymbols(func, localScope, tree);
-    newDeclarations.insert(newDeclarations.end(), declarations.begin(),
-                           declarations.end());
-  }
-
-  if (right->getNodeType() == AST::Stream) {
-    std::vector<ASTNode> declarations = declareUnknownStreamSymbols(
-        std::static_pointer_cast<StreamNode>(right), left, localScope, tree);
-    newDeclarations.insert(newDeclarations.end(), declarations.begin(),
-                           declarations.end());
-  } else if (right->getNodeType() == AST::Block) {
-    std::shared_ptr<BlockNode> name =
-        std::static_pointer_cast<BlockNode>(right);
-    int size = 0;
-    if (left->getNodeType() == AST::Function) {
-      auto funcDecl = ASTQuery::findDeclarationByName(
-          ASTQuery::getNodeName(left), localScope, tree);
-      if (funcDecl) {
-        size = CodeAnalysis::getTypeNumOutputs(funcDecl, localScope, m_tree);
-      }
+    ASTNode nextStreamMember;
+    if (right->getNodeType() != AST::Stream) {
+      nextStreamMember = right;
     } else {
-      size = CodeAnalysis::getNodeNumOutputs(left, localScope, m_tree);
+      nextStreamMember = std::static_pointer_cast<StreamNode>(right)->getLeft();
     }
-    if (size <= 0) { // None of the elements in the stream have size
-      size = 1;
+
+    if (left->getNodeType() == AST::Block) {
+      std::shared_ptr<BlockNode> name =
+          std::static_pointer_cast<BlockNode>(left);
+      int size = -1;
+      if (previousStreamMember) {
+        size = CodeAnalysis::getNodeNumOutputs(previousStreamMember, localScope,
+                                               m_tree);
+      }
+      if (size <= 0 && previousStreamMember) { // Look to the right if can't
+                                               // resolve from the left
+        // Size for first member should always be 1
+        size = CodeAnalysis::getNodeNumInputs(nextStreamMember, localScope,
+                                              m_tree);
+      }
+      if (size <= 0) { // None of the elements in the stream have size
+        size = 1;
+      }
+      std::vector<ASTNode> declarations =
+          declareUnknownName(name, size, localScope, tree);
+      newDeclarations.insert(newDeclarations.end(), declarations.begin(),
+                             declarations.end());
+    } else if (left->getNodeType() == AST::Expression) {
+      int size = 1; // FIXME implement size detection for expressions
+      std::shared_ptr<ExpressionNode> expr =
+          std::static_pointer_cast<ExpressionNode>(left);
+      std::vector<ASTNode> declarations =
+          declareUnknownExpressionSymbols(expr, size, localScope, tree);
+      newDeclarations.insert(newDeclarations.end(), declarations.begin(),
+                             declarations.end());
+    } else if (left->getNodeType() == AST::Function) {
+      std::shared_ptr<FunctionNode> func =
+          std::static_pointer_cast<FunctionNode>(left);
+      std::vector<ASTNode> declarations =
+          declareUnknownFunctionSymbols(func, localScope, tree);
+      newDeclarations.insert(newDeclarations.end(), declarations.begin(),
+                             declarations.end());
     }
-    std::vector<ASTNode> declarations =
-        declareUnknownName(name, size, localScope, tree);
-    newDeclarations.insert(newDeclarations.end(), declarations.begin(),
-                           declarations.end());
-  } else if (right->getNodeType() == AST::Function) {
-    std::shared_ptr<FunctionNode> func =
-        std::static_pointer_cast<FunctionNode>(right);
-    std::vector<ASTNode> declarations =
-        declareUnknownFunctionSymbols(func, localScope, tree);
-    newDeclarations.insert(newDeclarations.end(), declarations.begin(),
-                           declarations.end());
+
+    if (right->getNodeType() == AST::Stream) {
+      std::vector<ASTNode> declarations = declareUnknownStreamSymbols(
+          std::static_pointer_cast<StreamNode>(right), left, localScope, tree);
+      newDeclarations.insert(newDeclarations.end(), declarations.begin(),
+                             declarations.end());
+    } else if (right->getNodeType() == AST::Block) {
+      std::shared_ptr<BlockNode> name =
+          std::static_pointer_cast<BlockNode>(right);
+      int size = 0;
+      if (left->getNodeType() == AST::Function) {
+        auto funcDecl = ASTQuery::findDeclarationByName(
+            ASTQuery::getNodeName(left), localScope, tree);
+        if (funcDecl) {
+          size = CodeAnalysis::getTypeNumOutputs(funcDecl, localScope, m_tree);
+        }
+      } else {
+        size = CodeAnalysis::getNodeNumOutputs(left, localScope, m_tree);
+      }
+      if (size <= 0) { // None of the elements in the stream have size
+        size = 1;
+      }
+      std::vector<ASTNode> declarations =
+          declareUnknownName(name, size, localScope, tree);
+      newDeclarations.insert(newDeclarations.end(), declarations.begin(),
+                             declarations.end());
+    } else if (right->getNodeType() == AST::Function) {
+      std::shared_ptr<FunctionNode> func =
+          std::static_pointer_cast<FunctionNode>(right);
+      std::vector<ASTNode> declarations =
+          declareUnknownFunctionSymbols(func, localScope, tree);
+      newDeclarations.insert(newDeclarations.end(), declarations.begin(),
+                             declarations.end());
+    }
   }
   return newDeclarations;
 }

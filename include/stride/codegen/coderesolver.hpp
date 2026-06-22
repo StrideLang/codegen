@@ -204,6 +204,9 @@ private:
   SystemConfiguration m_systemConfig;
 
   ASTNode m_tree;
+
+  // Resolver configuration
+  bool m_declareUnknownSymbols = false;
 };
 } // namespace strd
 
