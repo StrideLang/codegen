@@ -2008,8 +2008,16 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
         }
       }
     }
+  } else if (node->getNodeType() == AST::Expression) {
+    // TODO get this from the library
+    auto typeName = resolveNodeOutDataType(node, scope, tree);
+    return {std::make_shared<BlockNode>(typeName, __FILE__, __LINE__)};
   } else if (node->getNodeType() == AST::Int ||
              node->getNodeType() == AST::Real) {
+    // TODO get this from the library
+    auto typeName = resolveNodeOutDataType(node, scope, tree);
+    return {std::make_shared<BlockNode>(typeName, __FILE__, __LINE__)};
+  } else if (node->getNodeType() == AST::Switch) {
     // TODO get this from the library
     auto typeName = resolveNodeOutDataType(node, scope, tree);
     return {std::make_shared<BlockNode>(typeName, __FILE__, __LINE__)};
