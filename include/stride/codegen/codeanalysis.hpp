@@ -130,8 +130,8 @@ public:
 
   static std::vector<ASTNode>
   getInputDataTypes(ASTNode node, const ScopeStack &scope, ASTNode tree);
-  static std::vector<ASTNode> getOutputDataTypes(ASTNode node, const ScopeStack &scope,
-                                   ASTNode tree);
+  static std::vector<ASTNode>
+  getOutputDataTypes(ASTNode node, const ScopeStack &scope, ASTNode tree);
   static ASTNode
   getDataTypeForSignalDeclaration(std::shared_ptr<DeclarationNode> decl);
   static std::string
@@ -156,6 +156,11 @@ public:
                                                  ASTNode tree);
 
   static std::vector<ASTNode> getDomainIOBlockDeclarations(ASTNode tree);
+
+  static std::shared_ptr<DeclarationNode>
+  matchDefinitionToTypes(std::vector<std::shared_ptr<DeclarationNode>> decls,
+                         std::shared_ptr<FunctionNode> func,
+                         const ScopeStack &scope = {}, ASTNode tree = nullptr);
 };
 } // namespace strd
 
