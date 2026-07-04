@@ -1,0 +1,31 @@
+
+################# Simple module with input and output ports, and a single internal signal.
+# The module has an expression in the stream.
+signal Input { type: _IntType }
+signal Output { type: _IntType }
+
+module Mod {
+    ports: [
+        mainInputPort InputPort {
+            block: ModInput
+        }
+        mainOutputPort OutputPort {
+            block: ModOutput
+        }
+    ]
+    blocks: [
+        signal ModInput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModOutput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModInternal {domain: OutputPort.domain type:OutputPort.type}
+    ]
+    streams: [
+        ModInput + ModInternal >> ModOutput;
+    ]
+}
+Input >> Mod() >> Output;
+
+################# Lists in root context
+signal ListInput { type: _IntType }
+signal ListOutput { type: _IntType }
+
+[ListInput, ListInput] >> [ListOutput, ListOutput];

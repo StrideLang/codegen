@@ -1,0 +1,15 @@
+
+platformModule PlatformModule {
+    inputs: [_RealType, _RealType]
+	outputs: [_SwitchType]
+#    linkTo: []
+#    declarations: ['']
+    # initializations: ["// CPP Greater Init"]
+    processing: "fcmp ogt"
+    inherits: [_Signal]
+}
+
+signal Input[2] { type: _RealType}
+signal Output { type: _SwitchType}
+
+Input >> PlatformModule() >> Output;

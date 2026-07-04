@@ -77,18 +77,17 @@ private:
   void resolveConstants();
   void resolvePortProperties();
   void processDomains();
-  void setPortBlockAttributes();
-  void resolveAttributes(); // Resolve CodeGenetaror port attributes: rate, type
+  void setPortBlockAttributes(const ScopeStack &scope, ASTNode tree);
+  void resolveAttributes(const ScopeStack &scope, ASTNode tree); // Resolve CodeGenetaror port attributes: rate, type
   void analyzeConnections();
   void resolveTypeCasting();
   void storeDeclarations();
   void analyzeParents();
-
-  void printTree();
+  void analyzePersistence();
 
   // Sub functions
-  void resolveStreamRatesReverse(std::shared_ptr<StreamNode> stream);
-  void resolveStreamRates(std::shared_ptr<StreamNode> stream);
+  void resolveStreamRatesReverse(std::shared_ptr<StreamNode> stream, const ScopeStack &scope, ASTNode tree);
+  void resolveStreamRates(std::shared_ptr<StreamNode> stream, const ScopeStack &scope, ASTNode tree);
   void resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
                                  ScopeStack stack, ASTNode tree);
   void resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
@@ -103,6 +102,8 @@ private:
   ASTNode expandFunctionFromProperties(std::shared_ptr<FunctionNode> func,
                                        ScopeStack scope, ASTNode tree);
 
+  void markNodePersistence(ASTNode streamsList, ASTNode blocksList,
+                           ScopeStack &scope);
   void analyzeChildConnections(ASTNode node,
                                ScopeStack scopeStack = ScopeStack());
 
@@ -148,10 +149,6 @@ private:
 
   void propagateDomainsForNode(ASTNode node, ScopeStack scopeStack);
   void resolveDomainForStreamNode(ASTNode node, ScopeStack scope);
-
-  void remapStreamDomains(std::shared_ptr<StreamNode> stream,
-                          std::map<std::string, std::string> domainMap,
-                          ScopeStack scopeStack, ASTNode tree);
 
   ASTNode resolvePortProperty(std::shared_ptr<PortPropertyNode> portProperty,
                               ScopeStack scopeStack);

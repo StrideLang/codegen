@@ -1,0 +1,157 @@
+##################### Nested modules with input and output ports, and a single internal signal.
+
+module NestedMod {
+    ports: [
+        mainInputPort InputPort {
+            block: NestedModInput
+        }
+        mainOutputPort OutputPort {
+            block: NestedModOutput
+        }
+    ]
+    blocks: [
+        signal NestedModInput {domain: OutputPort.domain type:OutputPort.type}
+        signal NestedModOutput {domain: OutputPort.domain type:OutputPort.type}
+        signal NestedModInternal {domain: OutputPort.domain type:OutputPort.type}
+    ]
+    streams: [
+       NestedModInput + NestedModInternal >> NestedModOutput;
+    ]
+}
+
+module NestingMod {
+    ports: [
+        mainInputPort InputPort {
+            block: NestingModInput
+        }
+        mainOutputPort OutputPort {
+            block: NestingModOutput
+        }
+    ]
+    blocks: [
+        signal NestingModInput {domain: OutputPort.domain type:OutputPort.type}
+        signal NestingModOutput {domain: OutputPort.domain type:OutputPort.type}
+        signal NestingModInternal {domain: OutputPort.domain type:OutputPort.type}
+    ]
+    streams: [
+        NestingModInput + NestingModInternal >> NestedMod() >> NestingModOutput;
+    ]
+}
+
+signal NestedInput { type: _IntType }
+signal NestedOutput { type: _IntType }
+
+NestedInput >> NestingMod() >> NestedOutput;
+
+################## Nested Reaction
+signal Input { type: _IntType }
+signal Output { type: _IntType }
+
+reaction NestedReaction {
+    ports: [
+        mainOutputPort OutputPort {
+            block: NestedReactionOutput
+        }
+    ]
+    blocks: [
+        signal NestedReactionOutput {domain: OutputPort.domain type:OutputPort.type}
+        signal NestedReactionInternal {domain: OutputPort.domain type:OutputPort.type}
+    ]
+    streams: [
+        NestedReactionInternal >> NestedReactionOutput;
+    ]
+}
+
+module Mod {
+    ports: [
+        mainInputPort InputPort {
+            block: ModInput
+        }
+        mainOutputPort OutputPort {
+            block: ModOutput
+        }
+    ]
+    blocks: [
+        signal ModInput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModOutput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModInternal {domain: OutputPort.domain type:OutputPort.type}
+    ]
+    streams: [
+        on >> NestedReaction() >> ModInternal;
+        ModInput + ModInternal >> ModOutput;
+    ]
+}
+Input >> Mod() >> Output;
+
+################## Nested Loop
+
+signal Input { type: _IntType }
+signal Output { type: _IntType }
+
+loop NestedLoop {
+	ports: [
+		mainInputPort InputPort {
+			block: Input
+		}
+		mainOutputPort OutputPort {
+			block: Output
+		}
+	]
+	blocks: [
+		signal Input { type: _IntType }
+		signal Output {default: 0 type: _IntType }
+		signal Index { default: 0 type: _IntType }
+		switch Done { default: off }
+	]
+	terminateWhen: Done
+	streams: [
+		Input + Output >> Output ;
+		Index + 1 >> Index ;
+		on >> Done ;
+	]
+}
+
+module ModWithLoop {
+    ports: [
+        mainInputPort InputPort {
+            block: ModInput
+        }
+        mainOutputPort OutputPort {
+            block: ModOutput
+        }
+    ]
+    blocks: [
+        signal ModInput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModOutput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModInternal {domain: OutputPort.domain type:OutputPort.type}
+    ]
+    streams: [
+        on >> NestedLoop() >> ModInternal;
+        ModInput + ModInternal >> ModOutput;
+    ]
+}
+Input >> ModWithLoop() >> Output;
+
+#### Module persistent variable
+
+module ModulePersistentVar {
+    ports: [
+        mainInputPort InputPort {
+            block: Input
+        }
+        mainOutputPort OutputPort {
+            block: Output
+        }
+    ]
+    blocks: [
+        signal Input {domain: OutputPort.domain type:OutputPort.type}
+        signal Output {domain: OutputPort.domain type:OutputPort.type}
+        signal InternalPersistent {domain: OutputPort.domain type:OutputPort.type}
+    ]
+    streams: [
+        InternalPersistent >> Output;
+        Input + InternalPersistent  >> InternalPersistent;
+    ]
+}
+
+Input >> ModulePersistentVar() >> Output;

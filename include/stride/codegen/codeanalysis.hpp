@@ -2,6 +2,7 @@
 #define CODEANALYSIS_HPP
 
 #include "stride/parser/strideparser.h"
+
 #include "stridesystem.hpp"
 
 namespace strd {
@@ -140,7 +141,7 @@ public:
 
   static std::string resolveBundleDataType(BundleNode *bundle,
                                            ScopeStack scopeStack, ASTNode tree);
-  static std::string resolveBlockDataType(BlockNode *name,
+  static std::string resolveBlockDataType(std::shared_ptr<BlockNode> name,
                                           ScopeStack scopeStack, ASTNode tree);
   static std::string resolveNodeOutDataType(ASTNode node, ScopeStack scopeStack,
                                             ASTNode tree);
@@ -161,6 +162,29 @@ public:
   matchDefinitionToTypes(std::vector<std::shared_ptr<DeclarationNode>> decls,
                          std::shared_ptr<FunctionNode> func,
                          const ScopeStack &scope = {}, ASTNode tree = nullptr);
+
+  using DataInfo = std::pair<ASTNode, std::string>; // Instance, Type
+  struct TypeTree {
+    ASTNode instance;
+    std::vector<TypeTree> nodes;
+    // External refers to data declared above this scope.
+    std::vector<DataInfo> external;
+    std::vector<DataInfo> persistent; // store state that persistes across calls
+    std::vector<DataInfo> internal;
+
+    bool contains(std::string name);
+  };
+
+  static TypeTree getStateStructInformation(const ScopeStack &scope,
+                                            ASTNode tree);
+
+private:
+  static TypeTree
+  getTypeTreeForFunctionInstance(std::shared_ptr<FunctionNode> func,
+                                 const ScopeStack &scope, ASTNode tree,
+                                 int &instanceCounter);
+  static void processStreamNode(ASTNode streamNode, const ScopeStack &scope,
+                                ASTNode tree, TypeTree &typeTree);
 };
 } // namespace strd
 

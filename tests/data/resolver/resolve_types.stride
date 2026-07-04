@@ -24,6 +24,7 @@ signal ForwardModuleInInt { type: _IntType}
 signal ForwardModuleOutInt { type: _IntType}
 signal ForwardModuleOutResolved {}
 signal ForwardModuleInResolved {}
+signal ForwardModuleInNotResolved {}
 
 ForwardModuleIn >> PassThroughForward() >> ForwardModuleOut; # nothing should be resolved here
 ForwardModuleInInt >> PassThroughForward() >> ForwardModuleOutResolved; # forward resolve

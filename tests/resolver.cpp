@@ -5,7 +5,60 @@
 #include "stride/utils/astquery.h"
 // #include "stride/codegen/stridelibrary.hpp"
 
+#include <fstream>
+
 using namespace strd;
+
+std::string writeCodeToFile(std::string code) {
+  std::string fileName = "temp.stride";
+  std::ofstream output_file(fileName);
+
+  EXPECT_TRUE(output_file.is_open());
+
+  output_file << code;
+  output_file.close();
+  return fileName;
+}
+
+TEST(Resolver, ResolveBlockPersistence) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree;
+
+  auto fileName = writeCodeToFile(R"(
+Noop >> WrittenFirst;
+
+WrittenFirst >> Noop;
+
+ReadFirst >> Noop;
+Noop >> ReadFirst;
+)");
+
+  tree = AST::parseFile(fileName.c_str());
+  ASSERT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+  {
+    auto decl =
+        ASTQuery::findDeclarationByName("WrittenFirst", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto persistentProp = decl->getCompilerProperty("persistent");
+    EXPECT_FALSE(persistentProp);
+  }
+  {
+    auto decl =
+        ASTQuery::findDeclarationByName("ReadFirst", ScopeStack(), tree);
+    EXPECT_TRUE(decl);
+    auto persistentProp = decl->getCompilerProperty("persistent");
+    ASSERT_TRUE(persistentProp);
+    EXPECT_EQ(persistentProp->getNodeType(), AST::Switch);
+    EXPECT_TRUE(
+        std::static_pointer_cast<ValueNode>(persistentProp)->getSwitchValue());
+  }
+  // TODO resolve persistence recursively in function instances
+  // https://github.com/StrideLang/codegen/issues/4
+}
 
 TEST(Resolver, ResolveTypes) {
   auto strideroot = ASTFunctions::getDefaultStrideRoot();
@@ -258,7 +311,7 @@ TEST(Resolver, SynthesizeBundleDeclarationMemberNested) {
   EXPECT_TRUE(decl);
   auto elementDecl =
       ASTQuery::synthesizeBundleDeclarationElement(decl, 3, ScopeStack(), tree);
-  EXPECT_TRUE(elementDecl);
+  ASSERT_TRUE(elementDecl);
   EXPECT_EQ(elementDecl->getNodeType(), AST::Declaration);
   auto elementValue = elementDecl->getPropertyValue("values");
   // EXPECT_TRUE(elementValue);
