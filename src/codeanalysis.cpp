@@ -2562,6 +2562,8 @@ CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
             }
           }
         }
+        assert(!typeTree.instance);
+        typeTree.instance = decl;
       }
     }
   }

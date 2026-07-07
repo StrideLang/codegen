@@ -187,6 +187,8 @@ TEST(CodeAnalysis, TypeTreeDomain) {
 
   auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
 
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.instance), "TestDomain");
+
   ASSERT_EQ(typeTree.external.size(), 2);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.external[0].first), "Out");
   EXPECT_EQ(typeTree.external[0].second, "_RealType");
