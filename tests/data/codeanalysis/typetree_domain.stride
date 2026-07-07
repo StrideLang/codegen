@@ -1,0 +1,41 @@
+
+# No system, so we need to call it RootDomain
+_domainDefinition TestDomain {
+	framework: _JitFramework
+	# requiresResources: [_RootContext]
+	# providesResources: [_DomainFunction]
+	rate: -1 # -1 is 'one-shot/final' domain
+    substitutions: [ ]
+    domainIncludes: []
+    inputs: [
+        signal In { domain: TestDomain type: _RealType}
+    ]
+    outputs: [
+        signal Out { domain: TestDomain type: _RealType}
+    ]
+	domainFunctionCode: ''
+}
+
+module Mod {
+    ports: [
+        mainInputPort InputPort {
+            block: ModInput
+        }
+        mainOutputPort OutputPort {
+            block: ModOutput
+        }
+    ]
+    blocks: [
+        signal ModInput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModOutput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModInternal {domain: OutputPort.domain type:OutputPort.type}
+    ]
+    streams: [
+        ModInput + ModInternal >> ModOutput;
+    ]
+}
+
+signal Value { type: _RealType domain: TestDomain }
+
+In >> Mod() >> Value;
+Value >> Out;

@@ -2422,6 +2422,9 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
             ASTQuery::getNodeName(func), scope, tree);
         auto funcType = ASTQuery::findTypeDeclaration(funcDecl, scope, tree);
 
+        // TODO we should sort the inputs and outputs not by order of appearance
+        // in streams, but by order of port declarations
+
         if (ASTQuery::isCodeGenerator(funcType, scope, tree) &&
             ASTQuery::isCallable(funcType, scope, tree)) {
           auto mainOutputPort =
@@ -2439,11 +2442,12 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
               auto type = resolveBlockDataType(
                   std::static_pointer_cast<BlockNode>(outputBlock), {}, tree);
               if (!typeTree.contains(blockName)) {
-                typeTree.external.push_back({outputBlockDecl, type});
+                typeTree.output.push_back({outputBlockDecl, type});
               }
               return;
             }
           }
+          // TODO add secondary output ports
 
           auto mainInputPort = ASTQuery::getModuleMainInputPortBlock(funcDecl);
           if (mainInputPort) {
@@ -2460,12 +2464,12 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
                   std::static_pointer_cast<BlockNode>(inputBlock), {}, tree);
 
               if (!typeTree.contains(blockName)) {
-                typeTree.external.push_back({inputBlockDecl, type});
+                typeTree.input.push_back({inputBlockDecl, type});
               }
               return;
             }
           }
-          // TODO input and output secondary ports
+          // TODO secondary input ports
 
           // Blocks in modules are local unless marked as persistent
           blockDecl = ASTQuery::findDeclarationByName(
@@ -2486,6 +2490,9 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
               return;
             }
           }
+
+          // TODO add any remaining as external?
+
         } else {
           std::cerr << "Unexpected function type: " << funcDecl->toText()
                     << std::endl;
@@ -2525,6 +2532,39 @@ CodeAnalysis::TypeTree
 CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
   CodeAnalysis::TypeTree typeTree;
 
+  // TODO support multiple domains
+  for (const auto &node : tree->getChildren()) {
+    if (node->getNodeType() == AST::Declaration ||
+        node->getNodeType() == AST::BundleDeclaration) {
+      auto decl = std::static_pointer_cast<DeclarationNode>(node);
+      if (decl->getObjectType() == "_domainDefinition") {
+        auto outputsList = decl->getPropertyValue("outputs");
+        if (outputsList) {
+          for (const auto &domainNode : outputsList->getChildren()) {
+            if (domainNode->getNodeType() == AST::Declaration ||
+                domainNode->getNodeType() == AST::BundleDeclaration) {
+              auto blockDecl =
+                  std::static_pointer_cast<DeclarationNode>(domainNode);
+              auto type = getDataTypeForDeclaration(blockDecl, {}, tree);
+              typeTree.external.push_back({blockDecl, type});
+            }
+          }
+        }
+        auto inputsList = decl->getPropertyValue("inputs");
+        if (inputsList) {
+          for (const auto &domainNode : inputsList->getChildren()) {
+            if (domainNode->getNodeType() == AST::Declaration ||
+                domainNode->getNodeType() == AST::BundleDeclaration) {
+              auto blockDecl =
+                  std::static_pointer_cast<DeclarationNode>(domainNode);
+              auto type = getDataTypeForDeclaration(blockDecl, {}, tree);
+              typeTree.external.push_back({blockDecl, type});
+            }
+          }
+        }
+      }
+    }
+  }
   for (const auto &node : tree->getChildren()) {
     if (node->getNodeType() == AST::Stream) {
       StreamNodeIterator it(std::static_pointer_cast<StreamNode>(node));
@@ -2539,6 +2579,16 @@ CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
 }
 
 bool CodeAnalysis::TypeTree::contains(std::string name) {
+  for (const auto &elem : output) {
+    if (ASTQuery::getNodeName(elem.first) == name) {
+      return true;
+    }
+  }
+  for (const auto &elem : input) {
+    if (ASTQuery::getNodeName(elem.first) == name) {
+      return true;
+    }
+  }
   for (const auto &elem : external) {
     if (ASTQuery::getNodeName(elem.first) == name) {
       return true;
@@ -2555,4 +2605,24 @@ bool CodeAnalysis::TypeTree::contains(std::string name) {
     }
   }
   return false;
+}
+
+CodeAnalysis::TypeTree *
+CodeAnalysis::TypeTree::find(ASTNode node, CodeAnalysis::TypeTree *tree) {
+  if (!tree) {
+    tree = this;
+  }
+  if (tree->instance == node) {
+    return tree;
+  }
+  for (auto &innerTree : tree->nodes) {
+    if (tree->instance == node) {
+      return tree;
+    }
+    auto *foundTree = find(node, &innerTree);
+    if (foundTree) {
+      return foundTree;
+    }
+  }
+  return nullptr;
 }

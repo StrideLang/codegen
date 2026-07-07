@@ -1,6 +1,8 @@
 #ifndef CODEANALYSIS_HPP
 #define CODEANALYSIS_HPP
 
+#include <optional>
+
 #include "stride/parser/strideparser.h"
 
 #include "stridesystem.hpp"
@@ -168,11 +170,15 @@ public:
     ASTNode instance;
     std::vector<TypeTree> nodes;
     // External refers to data declared above this scope.
+    std::vector<DataInfo> input;
+    std::vector<DataInfo> output;
     std::vector<DataInfo> external;
     std::vector<DataInfo> persistent; // store state that persistes across calls
     std::vector<DataInfo> internal;
 
     bool contains(std::string name);
+    CodeAnalysis::TypeTree *find(ASTNode node,
+                                 CodeAnalysis::TypeTree *tree = nullptr);
   };
 
   static TypeTree getStateStructInformation(const ScopeStack &scope,

@@ -31,10 +31,11 @@ TEST(CodeAnalysis, TypeTree) {
 
   ASSERT_EQ(typeTree.nodes.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].instance), "Mod");
-  ASSERT_EQ(typeTree.nodes[0].external.size(), 2);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].external[0].first),
+  ASSERT_EQ(typeTree.nodes[0].input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].input[0].first),
             "ModInput");
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].external[1].first),
+  ASSERT_EQ(typeTree.nodes[0].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].output[0].first),
             "ModOutput");
   ASSERT_EQ(typeTree.nodes[0].internal.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].internal[0].first),
@@ -67,10 +68,11 @@ TEST(CodeAnalysis, TypeTreeModuleNested) {
   ASSERT_EQ(typeTree.nodes.size(), 4);
 
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].instance), "NestingMod");
-  ASSERT_EQ(typeTree.nodes[0].external.size(), 2);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].external[0].first),
+  ASSERT_EQ(typeTree.nodes[0].input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].input[0].first),
             "NestingModInput");
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].external[1].first),
+  ASSERT_EQ(typeTree.nodes[0].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].output[0].first),
             "NestingModOutput");
   ASSERT_EQ(typeTree.nodes[0].internal.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].internal[0].first),
@@ -78,20 +80,22 @@ TEST(CodeAnalysis, TypeTreeModuleNested) {
   ASSERT_EQ(typeTree.nodes[0].nodes.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].instance),
             "NestedMod");
-  ASSERT_EQ(typeTree.nodes[0].nodes[0].external.size(), 2);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].external[0].first),
+  ASSERT_EQ(typeTree.nodes[0].nodes[0].input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].input[0].first),
             "NestedModInput");
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].external[1].first),
+  ASSERT_EQ(typeTree.nodes[0].nodes[0].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].output[0].first),
             "NestedModOutput");
   ASSERT_EQ(typeTree.nodes[0].nodes[0].internal.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].internal[0].first),
             "NestedModInternal");
 
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].instance), "Mod");
-  ASSERT_EQ(typeTree.nodes[1].external.size(), 2);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].external[0].first),
+  ASSERT_EQ(typeTree.nodes[1].input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].input[0].first),
             "ModInput");
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].external[1].first),
+  ASSERT_EQ(typeTree.nodes[1].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].output[0].first),
             "ModOutput");
   ASSERT_EQ(typeTree.nodes[1].internal.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].internal[0].first),
@@ -100,18 +104,19 @@ TEST(CodeAnalysis, TypeTreeModuleNested) {
   ASSERT_EQ(typeTree.nodes[1].nodes.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].nodes[0].instance),
             "NestedReaction");
-  ASSERT_EQ(typeTree.nodes[1].nodes[0].external.size(), 1);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].nodes[0].external[0].first),
+  ASSERT_EQ(typeTree.nodes[1].nodes[0].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].nodes[0].output[0].first),
             "NestedReactionOutput");
   ASSERT_EQ(typeTree.nodes[1].nodes[0].internal.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[1].nodes[0].internal[0].first),
             "NestedReactionInternal");
 
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].instance), "ModWithLoop");
-  ASSERT_EQ(typeTree.nodes[2].external.size(), 2);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].external[0].first),
+  ASSERT_EQ(typeTree.nodes[2].input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].input[0].first),
             "ModInput");
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].external[1].first),
+  ASSERT_EQ(typeTree.nodes[2].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].output[0].first),
             "ModOutput");
   ASSERT_EQ(typeTree.nodes[2].internal.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].internal[0].first),
@@ -120,10 +125,11 @@ TEST(CodeAnalysis, TypeTreeModuleNested) {
   ASSERT_EQ(typeTree.nodes[2].nodes.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].instance),
             "NestedLoop");
-  ASSERT_EQ(typeTree.nodes[2].nodes[0].external.size(), 2);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].external[0].first),
+  ASSERT_EQ(typeTree.nodes[2].nodes[0].input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].input[0].first),
             "Input");
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].external[1].first),
+  ASSERT_EQ(typeTree.nodes[2].nodes[0].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].output[0].first),
             "Output");
   ASSERT_EQ(typeTree.nodes[2].nodes[0].internal.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].internal[0].first),
@@ -135,11 +141,10 @@ TEST(CodeAnalysis, TypeTreeModuleNested) {
 
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[3].instance),
             "ModulePersistentVar");
-  ASSERT_EQ(typeTree.nodes[3].external.size(), 2);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[3].external[0].first),
-            "Output");
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[3].external[1].first),
-            "Input");
+  ASSERT_EQ(typeTree.nodes[3].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[3].output[0].first), "Output");
+  ASSERT_EQ(typeTree.nodes[3].input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[3].input[0].first), "Input");
   ASSERT_EQ(typeTree.nodes[3].persistent.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[3].persistent[0].first),
             "InternalPersistent");
@@ -168,6 +173,29 @@ TEST(CodeAnalysis, TypeTreePlatform) {
 
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].instance),
             "PlatformModule");
+}
+
+TEST(CodeAnalysis, TypeTreeDomain) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree;
+  tree = AST::parseFile(TESTS_SOURCE_DIR "codeanalysis/typetree_domain.stride");
+  EXPECT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
+
+  ASSERT_EQ(typeTree.external.size(), 2);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.external[0].first), "Out");
+  EXPECT_EQ(typeTree.external[0].second, "_RealType");
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.external[1].first), "In");
+  EXPECT_EQ(typeTree.external[1].second, "_RealType");
+
+  ASSERT_EQ(typeTree.internal.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.internal[0].first), "Value");
+  EXPECT_EQ(typeTree.internal[0].second, "_RealType");
 }
 
 TEST(CodeAnalysis, EvaluateBundleNumOutputs) {
