@@ -187,17 +187,20 @@ TEST(CodeAnalysis, TypeTreeDomain) {
 
   auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
 
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.instance), "TestDomain");
+  EXPECT_EQ(typeTree.nodes.size(), 1);
+  auto *domainTreeNode = typeTree.getDomainRoot("TestDomain");
+  EXPECT_TRUE(domainTreeNode);
+  EXPECT_EQ(ASTQuery::getNodeName(domainTreeNode->instance), "TestDomain");
 
-  ASSERT_EQ(typeTree.external.size(), 2);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.external[0].first), "Out");
-  EXPECT_EQ(typeTree.external[0].second, "_RealType");
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.external[1].first), "In");
-  EXPECT_EQ(typeTree.external[1].second, "_RealType");
+  ASSERT_EQ(domainTreeNode->external.size(), 2);
+  EXPECT_EQ(ASTQuery::getNodeName(domainTreeNode->external[0].first), "Out");
+  EXPECT_EQ(domainTreeNode->external[0].second, "_RealType");
+  EXPECT_EQ(ASTQuery::getNodeName(domainTreeNode->external[1].first), "In");
+  EXPECT_EQ(domainTreeNode->external[1].second, "_RealType");
 
-  ASSERT_EQ(typeTree.internal.size(), 1);
-  EXPECT_EQ(ASTQuery::getNodeName(typeTree.internal[0].first), "Value");
-  EXPECT_EQ(typeTree.internal[0].second, "_RealType");
+  ASSERT_EQ(domainTreeNode->internal.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(domainTreeNode->internal[0].first), "Value");
+  EXPECT_EQ(domainTreeNode->internal[0].second, "_RealType");
 }
 
 TEST(CodeAnalysis, EvaluateBundleNumOutputs) {

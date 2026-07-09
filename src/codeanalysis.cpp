@@ -1834,7 +1834,8 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
                   << std::endl;
       }
     } else {
-      std::cerr << " Could not find node declaration for " << block->getName()
+      std::cerr << __FILE__ << ":" << __LINE__
+                << " Could not find node declaration for " << block->getName()
                 << std::endl;
     }
   } else if (node->getNodeType() == AST::Bundle) {
@@ -1847,7 +1848,8 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
         return {getDataTypeForSignalDeclaration(decl)};
       }
     } else {
-      std::cerr << " Could not find node declaration for " << bundle->getName()
+      std::cerr << __FILE__ << ":" << __LINE__
+                << " Could not find node declaration for " << bundle->getName()
                 << std::endl;
     }
   } else if (node->getNodeType() == AST::Function) {
@@ -1938,7 +1940,8 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
         return {getDataTypeForSignalDeclaration(decl)};
       }
     } else {
-      std::cerr << " Could not find node declaration for " << block->getName()
+      std::cerr << __FILE__ << ":" << __LINE__
+                << " Could not find node declaration for " << block->getName()
                 << std::endl;
     }
   } else if (node->getNodeType() == AST::Bundle) {
@@ -1951,7 +1954,8 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
         return {getDataTypeForSignalDeclaration(decl)};
       }
     } else {
-      std::cerr << " Could not find node declaration for " << bundle->getName()
+      std::cerr << __FILE__ << ":" << __LINE__
+                << " Could not find node declaration for " << bundle->getName()
                 << std::endl;
     }
   } else if (node->getNodeType() == AST::Function) {
@@ -2408,7 +2412,14 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
         }
       }
     }
-    typeTree.nodes.push_back(functionTree);
+    auto domainName = CodeAnalysis::getNodeDomainName(func, scope, tree);
+    auto *domainTree = typeTree.getDomainRoot(domainName);
+    if (domainTree) {
+      domainTree->nodes.push_back(functionTree);
+    } else {
+      std::cerr << __FILE__ << ":" << __LINE__
+                << " ERROR: domain not found: " << std::endl;
+    }
   } else if (streamNode->getNodeType() == AST::Block) {
     auto block = std::static_pointer_cast<BlockNode>(streamNode);
     // Check if declared in tree root
@@ -2500,20 +2511,35 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
         }
       }
     }
+
     if (blockDecl) { // check if global
-      auto type = resolveBlockDataType(block, {}, tree);
-      if (!typeTree.contains(blockName)) {
-        typeTree.internal.push_back({blockDecl, type});
+      auto domainName = CodeAnalysis::getNodeDomainName(blockDecl, scope, tree);
+      auto *domainTree = typeTree.getDomainRoot(domainName);
+      if (domainTree) {
+        auto type = resolveBlockDataType(block, {}, tree);
+        if (!domainTree->contains(blockName)) {
+          domainTree->internal.push_back({blockDecl, type});
+        }
+      } else {
+        std::cerr << __FILE__ << ":" << __LINE__ << " ERROR: domain not found"
+                  << std::endl;
       }
+
     } else {
       // Check if declared in scope
       blockDecl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(block),
                                                   scope, tree);
-      if (blockDecl) { // If in scope it is an internal block
+
+      auto domainName = CodeAnalysis::getNodeDomainName(blockDecl, scope, tree);
+      auto *domainTree = typeTree.getDomainRoot(domainName);
+      if (domainTree) {
         auto type = resolveBlockDataType(block, {}, tree);
-        if (!typeTree.contains(blockName)) {
-          typeTree.internal.push_back({blockDecl, type});
+        if (!domainTree->contains(blockName)) {
+          domainTree->internal.push_back({blockDecl, type});
         }
+      } else {
+        std::cerr << __FILE__ << ":" << __LINE__ << " ERROR: domain not found"
+                  << std::endl;
       }
     }
   } else if (streamNode->getNodeType() == AST::Bundle) {
@@ -2532,12 +2558,15 @@ CodeAnalysis::TypeTree
 CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
   CodeAnalysis::TypeTree typeTree;
 
-  // TODO support multiple domains
+  std::vector<ASTNode> domainInstances;
   for (const auto &node : tree->getChildren()) {
     if (node->getNodeType() == AST::Declaration ||
         node->getNodeType() == AST::BundleDeclaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
       if (decl->getObjectType() == "_domainDefinition") {
+        typeTree.nodes.emplace_back(TypeTree());
+        auto &domainTree = typeTree.nodes.back();
+        domainTree.instance = decl;
         auto outputsList = decl->getPropertyValue("outputs");
         if (outputsList) {
           for (const auto &domainNode : outputsList->getChildren()) {
@@ -2546,7 +2575,9 @@ CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
               auto blockDecl =
                   std::static_pointer_cast<DeclarationNode>(domainNode);
               auto type = getDataTypeForDeclaration(blockDecl, {}, tree);
-              typeTree.external.push_back({blockDecl, type});
+              if (!domainTree.contains(blockDecl->getName())) {
+                domainTree.external.push_back({blockDecl, type});
+              }
             }
           }
         }
@@ -2558,15 +2589,16 @@ CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
               auto blockDecl =
                   std::static_pointer_cast<DeclarationNode>(domainNode);
               auto type = getDataTypeForDeclaration(blockDecl, {}, tree);
-              typeTree.external.push_back({blockDecl, type});
+              if (!domainTree.contains(blockDecl->getName())) {
+                domainTree.external.push_back({blockDecl, type});
+              }
             }
           }
         }
-        assert(!typeTree.instance);
-        typeTree.instance = decl;
       }
     }
   }
+
   for (const auto &node : tree->getChildren()) {
     if (node->getNodeType() == AST::Stream) {
       StreamNodeIterator it(std::static_pointer_cast<StreamNode>(node));
@@ -2627,4 +2659,21 @@ CodeAnalysis::TypeTree::find(ASTNode node, CodeAnalysis::TypeTree *tree) {
     }
   }
   return nullptr;
+}
+
+CodeAnalysis::TypeTree *
+CodeAnalysis::TypeTree::getDomainRoot(std::string domainName) {
+  for (auto &tree : this->nodes) {
+    if (tree.instance) {
+      if (tree.instance->getNodeType() == AST::Declaration) {
+        auto decl = std::static_pointer_cast<DeclarationNode>(tree.instance);
+        if (decl->getObjectType() == "_domainDefinition") {
+          if (decl->getName() == domainName) {
+            return &tree;
+          }
+        }
+      }
+    }
+  }
+  return this;
 }
