@@ -2413,7 +2413,7 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
       }
     }
     auto domainName = CodeAnalysis::getNodeDomainName(func, scope, tree);
-    auto *domainTree = typeTree.getDomainRoot(domainName);
+    auto *domainTree = typeTree.getDomainRootTree(domainName);
     if (domainTree) {
       domainTree->nodes.push_back(functionTree);
     } else {
@@ -2514,7 +2514,7 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
 
     if (blockDecl) { // check if global
       auto domainName = CodeAnalysis::getNodeDomainName(blockDecl, scope, tree);
-      auto *domainTree = typeTree.getDomainRoot(domainName);
+      auto *domainTree = typeTree.getDomainRootTree(domainName);
       if (domainTree) {
         auto type = resolveBlockDataType(block, {}, tree);
         if (!domainTree->contains(blockName)) {
@@ -2531,7 +2531,7 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
                                                   scope, tree);
 
       auto domainName = CodeAnalysis::getNodeDomainName(blockDecl, scope, tree);
-      auto *domainTree = typeTree.getDomainRoot(domainName);
+      auto *domainTree = typeTree.getDomainRootTree(domainName);
       if (domainTree) {
         auto type = resolveBlockDataType(block, {}, tree);
         if (!domainTree->contains(blockName)) {
@@ -2662,7 +2662,25 @@ CodeAnalysis::TypeTree::find(ASTNode node, CodeAnalysis::TypeTree *tree) {
 }
 
 CodeAnalysis::TypeTree *
-CodeAnalysis::TypeTree::getDomainRoot(std::string domainName) {
+CodeAnalysis::TypeTree::getParentTreeForNode(ASTNode node,
+                                             CodeAnalysis::TypeTree *tree) {
+  if (!tree) {
+    tree = this;
+  }
+  for (auto &childTree : tree->nodes) {
+    if (childTree.instance == node) {
+      return tree;
+    }
+    auto *foundTree = getParentTreeForNode(node, &childTree);
+    if (foundTree) {
+      return foundTree;
+    }
+  }
+  return nullptr;
+}
+
+CodeAnalysis::TypeTree *
+CodeAnalysis::TypeTree::getDomainRootTree(std::string domainName) {
   for (auto &tree : this->nodes) {
     if (tree.instance) {
       if (tree.instance->getNodeType() == AST::Declaration) {

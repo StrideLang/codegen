@@ -188,7 +188,7 @@ TEST(CodeAnalysis, TypeTreeDomain) {
   auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
 
   EXPECT_EQ(typeTree.nodes.size(), 1);
-  auto *domainTreeNode = typeTree.getDomainRoot("TestDomain");
+  auto *domainTreeNode = typeTree.getDomainRootTree("TestDomain");
   EXPECT_TRUE(domainTreeNode);
   EXPECT_EQ(ASTQuery::getNodeName(domainTreeNode->instance), "TestDomain");
 
@@ -259,4 +259,46 @@ TEST(CodeAnalysis, EvaluateSizePortProperty) {
     }
   }
   EXPECT_TRUE(checked);
+}
+
+TEST(CodeAnalysis, GetParentTreeForNode) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree;
+  tree = AST::parseFile(TESTS_SOURCE_DIR
+                        "codeanalysis/typetree_module_nested.stride");
+  ASSERT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
+
+  // We should have at least 1 nested node in typeTree.nodes
+  ASSERT_GE(typeTree.nodes.size(), 1);
+  auto nestingModTree = &typeTree.nodes[0];
+  EXPECT_EQ(ASTQuery::getNodeName(nestingModTree->instance), "NestingMod");
+
+  ASSERT_GE(nestingModTree->nodes.size(), 1);
+  auto nestedModTree = &nestingModTree->nodes[0];
+  EXPECT_EQ(ASTQuery::getNodeName(nestedModTree->instance), "NestedMod");
+
+  // Test 1: Get parent for a grandchild node (NestedMod)
+  auto *parentOfNested = typeTree.getParentTreeForNode(nestedModTree->instance);
+  ASSERT_NE(parentOfNested, nullptr);
+  EXPECT_EQ(parentOfNested, nestingModTree);
+
+  // Test 2: Get parent for a child node (NestingMod)
+  auto *parentOfNesting = typeTree.getParentTreeForNode(nestingModTree->instance);
+  ASSERT_NE(parentOfNesting, nullptr);
+  EXPECT_EQ(parentOfNesting, &typeTree);
+
+  // Test 3: Get parent for a node that is not in the tree
+  auto dummyNode = std::make_shared<BlockNode>("DummyBlock", __FILE__, __LINE__);
+  auto *parentOfDummy = typeTree.getParentTreeForNode(dummyNode);
+  EXPECT_EQ(parentOfDummy, nullptr);
+
+  // Test 4: Passing nullptr node
+  auto *parentOfNull = typeTree.getParentTreeForNode(nullptr);
+  EXPECT_EQ(parentOfNull, nullptr);
 }

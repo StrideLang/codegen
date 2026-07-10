@@ -179,7 +179,8 @@ public:
     bool contains(std::string name);
     CodeAnalysis::TypeTree *find(ASTNode node,
                                  CodeAnalysis::TypeTree *tree = nullptr);
-    TypeTree *getDomainRoot(std::string domainName);
+    TypeTree *getDomainRootTree(std::string domainName);
+    TypeTree *getParentTreeForNode(ASTNode node, CodeAnalysis::TypeTree *tree = nullptr);
   };
 
   static TypeTree getStateStructInformation(const ScopeStack &scope,
