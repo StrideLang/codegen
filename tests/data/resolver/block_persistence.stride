@@ -1,0 +1,25 @@
+module Test {
+    ports: [
+        mainInputPort InputPort {
+            block: ModInput
+        }
+        mainOutputPort OutputPort {
+            block: ModOutput
+        }
+    ]
+    blocks: [
+        signal ModInput {}
+        signal ModOutput {}
+        signal Noop {}
+        signal WrittenFirst {}
+        signal ReadFirst {}
+    ]
+    streams: [
+        Noop >> WrittenFirst;
+        WrittenFirst >> Noop;
+        ReadFirst >> Noop;
+        Noop >> ReadFirst;
+    ]
+}
+
+In >> Test() >> Out;

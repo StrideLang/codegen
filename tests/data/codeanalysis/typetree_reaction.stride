@@ -1,0 +1,53 @@
+
+# No system, so we need to call it RootDomain
+_domainDefinition TestDomain {
+	framework: _JitFramework
+	# requiresResources: [_RootContext]
+	# providesResources: [_DomainFunction]
+	rate: -1 # -1 is 'one-shot/final' domain
+    substitutions: [ ]
+    domainIncludes: []
+    inputs: [
+        signal In { domain: TestDomain type: _RealType}
+    ]
+    outputs: [
+        signal Out { domain: TestDomain type: _RealType}
+    ]
+	domainFunctionCode: ''
+}
+
+module Mod {
+    ports: [
+        mainInputPort InputPort {
+            block: ModInput
+        }
+        mainOutputPort OutputPort {
+            block: ModOutput
+        }
+    ]
+    blocks: [
+        signal ModInput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModOutput {domain: OutputPort.domain type:OutputPort.type}
+        signal ModInternal {domain: OutputPort.domain type:OutputPort.type}
+        reaction NestedReaction { 
+            blocks: [
+                signal ReactionInternal { default: 1 type: _RealType }
+            ]
+            streams: [
+                # ModuOutput is used inside reaction but not in module
+                ModInternal + ReactionInternal + 3.0 >> ModOutput;
+                ModOutput >> ReactionInternal; # Reactions are stateless, this should not trigger persistence
+            ]
+            domain: TestDomain
+        }
+    ]
+    streams: [
+        ModInput >> ModInternal;
+        on >> NestedReaction();
+    ]
+}
+
+signal Value { type: _RealType domain: TestDomain }
+
+In >> Mod() >> Value;
+Value >> Out;
