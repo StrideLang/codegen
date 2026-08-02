@@ -352,7 +352,7 @@ void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
 }
 
 void CodeResolver::markNodePersistence(ASTNode streamsList, ASTNode blocksList,
-                                       ScopeStack &scope) {
+                                       ScopeStack &scope, ASTNode tree) {
   assert(streamsList);
   std::set<std::string> blocksWritten;
   std::set<std::string> blocksRead;
@@ -380,11 +380,10 @@ void CodeResolver::markNodePersistence(ASTNode streamsList, ASTNode blocksList,
               auto blocksList = funcDecl->getPropertyValue("blocks");
               auto streamsList = funcDecl->getPropertyValue("streams");
               if (blocksList) {
-                scope.push_back({nullptr, blocksList->getChildren()});
+                scope.push_back({funcDecl, blocksList->getChildren()});
               }
-              markNodePersistence(streamsList, blocksList, scope);
+              markNodePersistence(streamsList, blocksList, scope, tree);
             }
-
           } else {
             std::cerr << "ERROR: Can't find declaration for: " << node->toText()
                       << std::endl;
@@ -414,10 +413,39 @@ void CodeResolver::markNodePersistence(ASTNode streamsList, ASTNode blocksList,
                 if (std::find(blocksWritten.begin(), blocksWritten.end(),
                               nodeName) == blocksWritten.end()) {
                   // First time writing but we have already read, this block
-                  // needs to be persistent.
-                  blockDeclInternal->setCompilerProperty(
-                      "persistent",
-                      std::make_shared<ValueNode>(true, __FILE__, __LINE__));
+                  // should to be persistent. But we need to check if scope
+                  // allows persistence.
+                  // TODO should this happen instead by explicitly making the
+                  // reset first before processing here?
+                  bool persistenceAllowed = true;
+                  if (scope.size() > 0) {
+                    auto parentNode = scope.back().first;
+                    if (parentNode &&
+                        (parentNode->getNodeType() == AST::Declaration ||
+                         parentNode->getNodeType() == AST::BundleDeclaration)) {
+                      auto parentDecl =
+                          std::static_pointer_cast<DeclarationNode>(parentNode);
+                      auto typeDecl = ASTQuery::findTypeDeclaration(
+                          parentDecl, scope, tree);
+                      // Assume type is stateful unless proven otherwise.
+                      // Is this the best idea?
+                      if (!typeDecl || (!ASTQuery::isStatelessGenerator(
+                                           typeDecl, scope, tree))) {
+                        if (persistenceAllowed) {
+                          blockDeclInternal->setCompilerProperty(
+                              "persistent", std::make_shared<ValueNode>(
+                                                true, __FILE__, __LINE__));
+                        }
+                      } else {
+                        std::cerr << __FILE__ << ":" << __LINE__
+                                  << " Error: could not find declaration for: "
+                                  << blockDeclInternal;
+                      }
+                    }
+                  } else {
+                    std::cerr << __FILE__ << ":" << __LINE__
+                              << " ERROR: parent node is null" << std::endl;
+                  }
                 }
               }
               blocksWritten.insert(nodeName);
@@ -1097,7 +1125,7 @@ void CodeResolver::analyzeParents() {
 
 void CodeResolver::analyzePersistence() {
   ScopeStack scope;
-  CodeResolver::markNodePersistence(m_tree, nullptr, scope);
+  CodeResolver::markNodePersistence(m_tree, nullptr, scope, m_tree);
 }
 
 void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,

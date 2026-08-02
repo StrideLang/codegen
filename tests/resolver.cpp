@@ -22,35 +22,26 @@ std::string writeCodeToFile(std::string code) {
 
 TEST(Resolver, ResolveBlockPersistence) {
   auto strideroot = ASTFunctions::getDefaultStrideRoot();
-  ASTNode tree;
-
-  auto fileName = writeCodeToFile(R"(
-Noop >> WrittenFirst;
-
-WrittenFirst >> Noop;
-
-ReadFirst >> Noop;
-Noop >> ReadFirst;
-)");
-
-  tree = AST::parseFile(fileName.c_str());
+  ASTNode tree =
+      AST::parseFile(TESTS_SOURCE_DIR "resolver/block_persistence.stride");
   ASSERT_TRUE(tree != nullptr);
   ASTFunctions::preprocess(tree);
 
   CodeResolver resolver(tree, strideroot);
   resolver.process();
   {
+    auto modDecl = ASTQuery::findDeclarationByName("Test", ScopeStack(), tree);
+    EXPECT_TRUE(modDecl);
+    auto blocks = modDecl->getPropertyValue("blocks");
+
     auto decl =
-        ASTQuery::findDeclarationByName("WrittenFirst", ScopeStack(), tree);
-    EXPECT_TRUE(decl);
+        ASTQuery::findDeclarationByName("WrittenFirst", ScopeStack(), blocks);
+    ASSERT_TRUE(decl);
     auto persistentProp = decl->getCompilerProperty("persistent");
     EXPECT_FALSE(persistentProp);
-  }
-  {
-    auto decl =
-        ASTQuery::findDeclarationByName("ReadFirst", ScopeStack(), tree);
-    EXPECT_TRUE(decl);
-    auto persistentProp = decl->getCompilerProperty("persistent");
+    decl = ASTQuery::findDeclarationByName("ReadFirst", ScopeStack(), blocks);
+    ASSERT_TRUE(decl);
+    persistentProp = decl->getCompilerProperty("persistent");
     ASSERT_TRUE(persistentProp);
     EXPECT_EQ(persistentProp->getNodeType(), AST::Switch);
     EXPECT_TRUE(

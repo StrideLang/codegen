@@ -141,10 +141,11 @@ public:
   getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
                             const ScopeStack &scope, ASTNode tree);
 
+  [[deprecated("Use resolveBlockDataType() instead.")]]
   static std::string resolveBundleDataType(BundleNode *bundle,
                                            ScopeStack scopeStack, ASTNode tree);
-  static std::string resolveBlockDataType(std::shared_ptr<BlockNode> name,
-                                          ScopeStack scopeStack, ASTNode tree);
+  static std::string resolveBlockDataType(ASTNode name, ScopeStack scopeStack,
+                                          ASTNode tree);
   static std::string resolveNodeOutDataType(ASTNode node, ScopeStack scopeStack,
                                             ASTNode tree);
   static std::string resolveListDataType(ListNode *listnode,
@@ -180,7 +181,8 @@ public:
     CodeAnalysis::TypeTree *find(ASTNode node,
                                  CodeAnalysis::TypeTree *tree = nullptr);
     TypeTree *getDomainRootTree(std::string domainName);
-    TypeTree *getParentTreeForNode(ASTNode node, CodeAnalysis::TypeTree *tree = nullptr);
+    TypeTree *getParentTreeForNode(ASTNode node,
+                                   CodeAnalysis::TypeTree *tree = nullptr);
   };
 
   static TypeTree getStateStructInformation(const ScopeStack &scope,

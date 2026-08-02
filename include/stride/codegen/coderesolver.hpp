@@ -78,7 +78,9 @@ private:
   void resolvePortProperties();
   void processDomains();
   void setPortBlockAttributes(const ScopeStack &scope, ASTNode tree);
-  void resolveAttributes(const ScopeStack &scope, ASTNode tree); // Resolve CodeGenetaror port attributes: rate, type
+  void resolveAttributes(
+      const ScopeStack &scope,
+      ASTNode tree); // Resolve CodeGenetaror port attributes: rate, type
   void analyzeConnections();
   void resolveTypeCasting();
   void storeDeclarations();
@@ -86,8 +88,10 @@ private:
   void analyzePersistence();
 
   // Sub functions
-  void resolveStreamRatesReverse(std::shared_ptr<StreamNode> stream, const ScopeStack &scope, ASTNode tree);
-  void resolveStreamRates(std::shared_ptr<StreamNode> stream, const ScopeStack &scope, ASTNode tree);
+  void resolveStreamRatesReverse(std::shared_ptr<StreamNode> stream,
+                                 const ScopeStack &scope, ASTNode tree);
+  void resolveStreamRates(std::shared_ptr<StreamNode> stream,
+                          const ScopeStack &scope, ASTNode tree);
   void resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
                                  ScopeStack stack, ASTNode tree);
   void resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
@@ -103,7 +107,7 @@ private:
                                        ScopeStack scope, ASTNode tree);
 
   void markNodePersistence(ASTNode streamsList, ASTNode blocksList,
-                           ScopeStack &scope);
+                           ScopeStack &scope, ASTNode tree);
   void analyzeChildConnections(ASTNode node,
                                ScopeStack scopeStack = ScopeStack());
 

@@ -131,13 +131,11 @@ TEST(CodeAnalysis, TypeTreeModuleNested) {
   ASSERT_EQ(typeTree.nodes[2].nodes[0].output.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].output[0].first),
             "Output");
-  ASSERT_EQ(typeTree.nodes[2].nodes[0].internal.size(), 1);
+  ASSERT_EQ(typeTree.nodes[2].nodes[0].internal.size(), 2);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].internal[0].first),
+            "Index");
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].internal[1].first),
             "Done");
-  ASSERT_EQ(typeTree.nodes[2].nodes[0].persistent.size(), 1);
-  EXPECT_EQ(
-      ASTQuery::getNodeName(typeTree.nodes[2].nodes[0].persistent[0].first),
-      "Index");
 
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[3].instance),
             "ModulePersistentVar");
@@ -203,6 +201,159 @@ TEST(CodeAnalysis, TypeTreeDomain) {
   EXPECT_EQ(domainTreeNode->internal[0].second, "_RealType");
 }
 
+TEST(CodeAnalysis, TypeTreeGetParentTreeForNode) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree;
+  tree = AST::parseFile(TESTS_SOURCE_DIR
+                        "codeanalysis/typetree_module_nested.stride");
+  ASSERT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
+
+  // We should have at least 1 nested node in typeTree.nodes
+  ASSERT_GE(typeTree.nodes.size(), 1);
+  auto nestingModTree = &typeTree.nodes[0];
+  EXPECT_EQ(ASTQuery::getNodeName(nestingModTree->instance), "NestingMod");
+
+  ASSERT_GE(nestingModTree->nodes.size(), 1);
+  auto nestedModTree = &nestingModTree->nodes[0];
+  EXPECT_EQ(ASTQuery::getNodeName(nestedModTree->instance), "NestedMod");
+
+  // Test 1: Get parent for a grandchild node (NestedMod)
+  auto *parentOfNested = typeTree.getParentTreeForNode(nestedModTree->instance);
+  ASSERT_NE(parentOfNested, nullptr);
+  EXPECT_EQ(parentOfNested, nestingModTree);
+
+  // Test 2: Get parent for a child node (NestingMod)
+  auto *parentOfNesting =
+      typeTree.getParentTreeForNode(nestingModTree->instance);
+  ASSERT_NE(parentOfNesting, nullptr);
+  EXPECT_EQ(parentOfNesting, &typeTree);
+
+  // Test 3: Get parent for a node that is not in the tree
+  auto dummyNode =
+      std::make_shared<BlockNode>("DummyBlock", __FILE__, __LINE__);
+  auto *parentOfDummy = typeTree.getParentTreeForNode(dummyNode);
+  EXPECT_EQ(parentOfDummy, nullptr);
+
+  // Test 4: Passing nullptr node
+  auto *parentOfNull = typeTree.getParentTreeForNode(nullptr);
+  EXPECT_EQ(parentOfNull, nullptr);
+}
+
+TEST(CodeAnalysis, TypeTreeReaction) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree;
+  tree =
+      AST::parseFile(TESTS_SOURCE_DIR "codeanalysis/typetree_reaction.stride");
+  ASSERT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
+
+  // We should have at least 1 nested node in typeTree.nodes
+  ASSERT_EQ(typeTree.nodes.size(), 1);
+  ASSERT_EQ(typeTree.nodes[0].nodes.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].instance), "Mod");
+  ASSERT_EQ(typeTree.nodes[0].nodes[0].input.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].input[0].first),
+            "ModInput");
+  // ModOutput is only used inside the nested reaction
+  ASSERT_EQ(typeTree.nodes[0].nodes[0].output.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].output[0].first),
+            "ModOutput");
+  ASSERT_EQ(typeTree.nodes[0].nodes[0].internal.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].internal[0].first),
+            "ModInternal");
+  // 2 external are used in reaction: ModOutput and ModInternal
+  ASSERT_EQ(typeTree.nodes[0].nodes[0].nodes[0].external.size(), 2);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].nodes[0].nodes[0].instance),
+            "NestedReaction");
+  ASSERT_EQ(ASTQuery::getNodeName(
+                typeTree.nodes[0].nodes[0].nodes[0].external[0].first),
+            "ModInternal");
+  // Reactions are stateless, so internals that would be persistent in modules
+  // are not
+  ASSERT_EQ(typeTree.nodes[0].nodes[0].nodes[0].internal.size(), 1);
+  ASSERT_FALSE(typeTree.nodes[0]
+                   .nodes[0]
+                   .nodes[0]
+                   .internal[0]
+                   .first->getCompilerProperty("persistent"));
+}
+
+TEST(CodeAnalysis, TypeTreeBundle) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree;
+  tree = AST::parseFile(TESTS_SOURCE_DIR "codeanalysis/typetree_bundle.stride");
+  EXPECT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
+
+  ASSERT_EQ(typeTree.internal.size(), 5);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.internal[0].first), "Input");
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.internal[1].first), "Output");
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.internal[2].first), "ListInput");
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.internal[3].first), "Index");
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.internal[4].first), "ListOutput");
+
+  ASSERT_EQ(typeTree.nodes[0].input.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].input[0].first),
+            "ModInput");
+  ASSERT_EQ(typeTree.nodes[0].output.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].output[0].first),
+            "ModOutput");
+  ASSERT_EQ(typeTree.nodes[0].internal.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].internal[0].first),
+            "ModInternal");
+}
+
+TEST(CodeAnalysis, TypeTreePortProperty) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree;
+  tree = AST::parseFile(TESTS_SOURCE_DIR
+                        "codeanalysis/typetree_portproperty.stride");
+  EXPECT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
+
+  ASSERT_EQ(typeTree.nodes.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].instance), "Mod");
+
+  ASSERT_EQ(typeTree.nodes[0].input.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].input[0].first),
+            "ModInput");
+  ASSERT_EQ(typeTree.nodes[0].output.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].output[0].first),
+            "ModOutput");
+  ASSERT_EQ(typeTree.nodes[0].internal.size(), 1);
+  ASSERT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].internal[0].first),
+            "ModInternal");
+  ASSERT_EQ(typeTree.nodes[0].external.size(), 1);
+  ASSERT_EQ(typeTree.nodes[0].external[0].first->getNodeType(),
+            AST::PortProperty);
+  auto pp = std::static_pointer_cast<PortPropertyNode>(
+      typeTree.nodes[0].external[0].first);
+
+  ASSERT_EQ(pp->getName(), "InputPort");
+  ASSERT_EQ(pp->getPortName(), "size");
+}
+
 TEST(CodeAnalysis, EvaluateBundleNumOutputs) {
   auto strideroot = ASTFunctions::getDefaultStrideRoot();
   ASTNode tree =
@@ -259,46 +410,4 @@ TEST(CodeAnalysis, EvaluateSizePortProperty) {
     }
   }
   EXPECT_TRUE(checked);
-}
-
-TEST(CodeAnalysis, GetParentTreeForNode) {
-  auto strideroot = ASTFunctions::getDefaultStrideRoot();
-  ASTNode tree;
-  tree = AST::parseFile(TESTS_SOURCE_DIR
-                        "codeanalysis/typetree_module_nested.stride");
-  ASSERT_TRUE(tree != nullptr);
-  ASTFunctions::preprocess(tree);
-
-  CodeResolver resolver(tree, strideroot);
-  resolver.process();
-
-  auto typeTree = CodeAnalysis::getStateStructInformation(ScopeStack(), tree);
-
-  // We should have at least 1 nested node in typeTree.nodes
-  ASSERT_GE(typeTree.nodes.size(), 1);
-  auto nestingModTree = &typeTree.nodes[0];
-  EXPECT_EQ(ASTQuery::getNodeName(nestingModTree->instance), "NestingMod");
-
-  ASSERT_GE(nestingModTree->nodes.size(), 1);
-  auto nestedModTree = &nestingModTree->nodes[0];
-  EXPECT_EQ(ASTQuery::getNodeName(nestedModTree->instance), "NestedMod");
-
-  // Test 1: Get parent for a grandchild node (NestedMod)
-  auto *parentOfNested = typeTree.getParentTreeForNode(nestedModTree->instance);
-  ASSERT_NE(parentOfNested, nullptr);
-  EXPECT_EQ(parentOfNested, nestingModTree);
-
-  // Test 2: Get parent for a child node (NestingMod)
-  auto *parentOfNesting = typeTree.getParentTreeForNode(nestingModTree->instance);
-  ASSERT_NE(parentOfNesting, nullptr);
-  EXPECT_EQ(parentOfNesting, &typeTree);
-
-  // Test 3: Get parent for a node that is not in the tree
-  auto dummyNode = std::make_shared<BlockNode>("DummyBlock", __FILE__, __LINE__);
-  auto *parentOfDummy = typeTree.getParentTreeForNode(dummyNode);
-  EXPECT_EQ(parentOfDummy, nullptr);
-
-  // Test 4: Passing nullptr node
-  auto *parentOfNull = typeTree.getParentTreeForNode(nullptr);
-  EXPECT_EQ(parentOfNull, nullptr);
 }
