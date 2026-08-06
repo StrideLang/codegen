@@ -3763,6 +3763,16 @@ void CodeResolver::storeDeclarationsForNode(ASTNode node, ScopeStack scopeStack,
   if (node->getNodeType() == AST::Function) {
     auto decl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
                                                 scopeStack, tree);
+    auto cachedDecl = std::static_pointer_cast<DeclarationNode>(
+        node->getCompilerProperty("declaration"));
+    if (cachedDecl) {
+      if (decl && cachedDecl != decl) {
+        std::cerr << "ERROR: Declaration mismatch for node '"
+                  << ASTQuery::getNodeName(node) << "'" << std::endl;
+      }
+    } else if (decl && decl->getObjectType() != "platformModule") {
+      node->setCompilerProperty("declaration", decl);
+    }
     std::vector<ASTNode> scopeBlocks;
     auto name = std::static_pointer_cast<FunctionNode>(node)->getName();
     if (decl) {
@@ -3780,8 +3790,13 @@ void CodeResolver::storeDeclarationsForNode(ASTNode node, ScopeStack scopeStack,
       node->getNodeType() == AST::Function) {
     auto decl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
                                                 scopeStack, tree);
-    if (decl && decl->getObjectType() != "platformModule") {
-      // TODO Verify first if property already exists.
+    auto cachedDecl = node->getCompilerProperty("declaration");
+    if (cachedDecl) {
+      if (decl && cachedDecl != decl) {
+        std::cerr << "ERROR: Declaration mismatch for node '"
+                  << ASTQuery::getNodeName(node) << "'" << std::endl;
+      }
+    } else if (decl && decl->getObjectType() != "platformModule") {
       node->setCompilerProperty("declaration", decl);
     }
   } else if (node->getNodeType() == AST::Expression ||
