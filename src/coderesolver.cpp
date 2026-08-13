@@ -192,6 +192,9 @@ void CodeResolver::resolveStreamRatesReverse(std::shared_ptr<StreamNode> stream,
                                              ASTNode tree) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
+  if (!right) {
+    return;
+  }
   double rate = CodeAnalysis::getNodeRate(left, scope, tree);
   double rightRate = -1;
   if (right->getNodeType() == AST::Stream) {
@@ -238,6 +241,8 @@ void CodeResolver::resolveStreamRates(std::shared_ptr<StreamNode> stream,
       }
     }
   }
+  if (!right)
+    return;
   double rightRate = -1;
   if (right->getNodeType() == AST::Stream) {
     rightRate = CodeAnalysis::getNodeRate(
@@ -279,6 +284,8 @@ void CodeResolver::resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
                                              ScopeStack stack, ASTNode tree) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
+  if (!right)
+    return;
   auto types = CodeAnalysis::getOutputDataTypes(left, stack, tree);
   std::vector<ASTNode> rightTypes;
   if (right->getNodeType() == AST::Stream) {
@@ -304,6 +311,8 @@ void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
                                              ScopeStack scope, ASTNode tree) {
   ASTNode left = stream->getLeft();
   ASTNode right = stream->getRight();
+  if (!right)
+    return;
   auto types = CodeAnalysis::getOutputDataTypes(left, scope, tree);
 
   if (right->getNodeType() == AST::Stream) {

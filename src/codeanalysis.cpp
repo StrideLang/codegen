@@ -13,10 +13,9 @@ std::vector<std::string> CodeAnalysis::getUsedDomains(ASTNode tree) {
   std::vector<std::string> domains;
   for (const ASTNode &node : tree->getChildren()) {
     if (node->getNodeType() == AST::Stream) {
-      auto streamNode = std::static_pointer_cast<StreamNode>(node);
-      auto childNode = streamNode->getLeft();
-      auto nextNode = streamNode->getRight();
-      while (childNode) {
+      StreamNodeIterator it(std::static_pointer_cast<StreamNode>(node));
+      while (it.hasNext()) {
+        ASTNode childNode = it.next();
         std::string domainName =
             CodeAnalysis::getNodeDomainName(childNode, {}, tree);
         if (domainName.size() > 0) {
@@ -24,16 +23,6 @@ std::vector<std::string> CodeAnalysis::getUsedDomains(ASTNode tree) {
               domains.end()) {
             domains.push_back(domainName);
           }
-        }
-        if (!nextNode) {
-          childNode = nullptr;
-        } else if (nextNode->getNodeType() == AST::Stream) {
-          streamNode = std::static_pointer_cast<StreamNode>(nextNode);
-          childNode = streamNode->getLeft();
-          nextNode = streamNode->getRight();
-        } else {
-          childNode = nextNode;
-          nextNode = nullptr;
         }
       }
     } else if (node->getNodeType() == AST::Declaration ||
@@ -1282,23 +1271,12 @@ CodeAnalysis::getUsedPortProperties(std::shared_ptr<DeclarationNode> funcDecl) {
   if (streams) {
     for (const auto &streamNode : streams->getChildren()) {
       if (streamNode->getNodeType() == AST::Stream) {
-        auto stream = std::static_pointer_cast<StreamNode>(streamNode);
-        ASTNode node = stream->getLeft();
-        ASTNode next = stream->getRight();
-        do {
+        StreamNodeIterator it(std::static_pointer_cast<StreamNode>(streamNode));
+        while (it.hasNext()) {
+          ASTNode node = it.next();
           auto newUsed = getUsedPortPropertiesInNode(node);
           used.insert(used.end(), newUsed.begin(), newUsed.end());
-
-          if (next && next->getNodeType() == AST::Stream) {
-            node = std::static_pointer_cast<StreamNode>(next)->getLeft();
-            next = std::static_pointer_cast<StreamNode>(next)->getRight();
-          } else if (next) {
-            node = next;
-            next = nullptr;
-          } else {
-            node = nullptr;
-          }
-        } while (node);
+        }
       }
     }
   }
