@@ -2058,7 +2058,7 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
       auto rootPortBlockDecl = ASTQuery::findDeclarationByName(
           ASTQuery::getNodeName(portBlock), subScope, m_tree);
       if (rootPortBlockDecl &&
-          rootPortBlockDecl->getObjectType() == "constant") {
+          ASTQuery::isConstant(rootPortBlockDecl, subScope, m_tree)) {
         portBlockDecl = rootPortBlockDecl;
       }
     }
@@ -2205,7 +2205,10 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
         ASTNode domainNode = CodeAnalysis::getNodeDomain(
             portBlock, {{node, internalBlocks->getChildren()}}, m_tree);
         if (!domainNode || domainNode->getNodeType() == AST::None) {
-          if (portBlockDecl && portBlockDecl->getObjectType() != "constant") {
+          if (portBlockDecl &&
+              !ASTQuery::isConstant(portBlockDecl,
+                                    {{node, internalBlocks->getChildren()}},
+                                    m_tree)) {
             portBlockDecl->setPropertyValue("domain", mainPortsDefaultDomain);
           }
         }
@@ -2406,7 +2409,7 @@ void CodeResolver::resolveConstants() {
     std::shared_ptr<DeclarationNode> decl =
         ASTQuery::findDeclarationByName(override->first, {}, m_tree);
     if (decl) {
-      if (decl->getObjectType() == "constant") {
+      if (ASTQuery::isConstant(decl, {}, m_tree)) {
         if (std::holds_alternative<std::string>(override->second)) {
           decl->replacePropertyValue(
               "value",
@@ -3123,7 +3126,7 @@ void CodeResolver::checkStreamConnections(std::shared_ptr<StreamNode> stream,
   } else if (left->getNodeType() == AST::Bundle) {
     auto decl = CodeAnalysis::getDeclaration(left);
     if (decl) {
-      if (decl->getObjectType() == "constant") {
+      if (ASTQuery::isConstant(decl, scopeStack, m_tree)) {
         // If constant, then the next stream node is sampling this one.
         auto indexList = std::static_pointer_cast<BundleNode>(left)->index();
 

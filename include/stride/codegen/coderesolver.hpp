@@ -61,10 +61,6 @@ public:
 
   std::shared_ptr<StrideSystem> getSystem() { return m_system; }
 
-  static std::shared_ptr<DeclarationNode>
-  createSignalDeclaration(std::string name, int size, ScopeStack scope,
-                          ASTNode tree);
-
 private:
   // Main processing functions
   void processSystem();
@@ -88,6 +84,9 @@ private:
   void analyzePersistence();
 
   // Sub functions
+  static std::shared_ptr<DeclarationNode>
+  createSignalDeclaration(std::string name, int size, ScopeStack scope,
+                          ASTNode tree);
   void resolveStreamRatesReverse(std::shared_ptr<StreamNode> stream,
                                  const ScopeStack &scope, ASTNode tree);
   void resolveStreamRates(std::shared_ptr<StreamNode> stream,

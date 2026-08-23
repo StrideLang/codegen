@@ -67,8 +67,7 @@ ASTNode CodeAnalysis::getInstance(ASTNode block, ScopeStack scopeStack,
             "trigger" ||
         std::static_pointer_cast<DeclarationNode>(block)->getObjectType() ==
             "string" ||
-        std::static_pointer_cast<DeclarationNode>(block)->getObjectType() ==
-            "constant") {
+        ASTQuery::isConstant(std::static_pointer_cast<DeclarationNode>(block), scopeStack, tree)) {
       inst = block;
     } else if (std::static_pointer_cast<DeclarationNode>(block)
                    ->getObjectType() == "reaction") {
@@ -512,7 +511,7 @@ double CodeAnalysis::resolveRateToFloat(ASTNode rateNode, ScopeStack scope,
     std::shared_ptr<DeclarationNode> valueDeclaration =
         ASTQuery::findDeclarationByName(block->getName(), scope, tree,
                                         block->getNamespaceList());
-    if (valueDeclaration && valueDeclaration->getObjectType() == "constant") {
+    if (valueDeclaration && ASTQuery::isConstant(valueDeclaration, scope, tree)) {
       std::shared_ptr<PropertyNode> property = ASTQuery::findPropertyByName(
           valueDeclaration->getProperties(), "value");
       if (property) {
@@ -1306,6 +1305,51 @@ CodeAnalysis::getUsedPortPropertiesInNode(ASTNode node) {
   return used;
 }
 
+std::vector<ASTNode>
+CodeAnalysis::getUsedBlocksInNode(ASTNode node) {
+  std::vector<ASTNode> used;
+  if (!node) return used;
+  
+  if (node->getNodeType() == AST::Block || node->getNodeType() == AST::Bundle) {
+    used.push_back(node);
+    if (node->getNodeType() == AST::Bundle) {
+      auto index = std::static_pointer_cast<BundleNode>(node)->index();
+      if (index) {
+        for (const auto &indexNode : index->getChildren()) {
+          auto newUsed = getUsedBlocksInNode(indexNode);
+          used.insert(used.end(), newUsed.begin(), newUsed.end());
+        }
+      }
+    }
+  } else if (node->getNodeType() == AST::List ||
+             node->getNodeType() == AST::Expression) {
+    for (const auto &elem : node->getChildren()) {
+      auto newUsed = getUsedBlocksInNode(elem);
+      used.insert(used.end(), newUsed.begin(), newUsed.end());
+    }
+  }
+  return used;
+}
+
+std::vector<ASTNode> CodeAnalysis::getUsedBlocksInStreams(
+    std::shared_ptr<DeclarationNode> funcDecl) {
+  std::vector<ASTNode> used;
+  auto streams = funcDecl->getPropertyValue("streams");
+  if (streams) {
+    for (const auto &streamNode : streams->getChildren()) {
+      if (streamNode->getNodeType() == AST::Stream) {
+        StreamNodeIterator it(std::static_pointer_cast<StreamNode>(streamNode));
+        while (it.hasNext()) {
+          ASTNode node = it.next();
+          auto newUsed = getUsedBlocksInNode(node);
+          used.insert(used.end(), newUsed.begin(), newUsed.end());
+        }
+      }
+    }
+  }
+  return used;
+}
+
 ASTNode CodeAnalysis::resolveDomain(ASTNode node, ScopeStack scopeStack,
                                     ASTNode tree, bool downStream) {
   auto blockDecl =
@@ -2059,7 +2103,7 @@ CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
               << std::endl;
     assert(0 == 1);
 
-  } else if (decl->getObjectType() == "constant") {
+  } else if (ASTQuery::isConstant(decl, scope, tree)) {
     std::shared_ptr<PropertyNode> property =
         ASTQuery::findPropertyByName(decl->getProperties(), "value");
     if (property) {
@@ -2080,7 +2124,7 @@ std::string CodeAnalysis::resolveBundleDataType(BundleNode *bundle,
   std::shared_ptr<DeclarationNode> declaration =
       ASTQuery::findDeclarationByName(bundle->getName(), scopeStack, tree);
   if (declaration) {
-    if (declaration->getObjectType() == "constant") {
+    if (ASTQuery::isConstant(declaration, scopeStack, tree)) {
       std::shared_ptr<PropertyNode> property =
           ASTQuery::findPropertyByName(declaration->getProperties(), "value");
       if (property) {
@@ -2111,7 +2155,7 @@ std::string CodeAnalysis::resolveBlockDataType(ASTNode node,
   std::shared_ptr<DeclarationNode> declaration =
       ASTQuery::findDeclarationByName(name, scopeStack, tree);
   if (declaration) {
-    if (declaration->getObjectType() == "constant") {
+    if (ASTQuery::isConstant(declaration, scopeStack, tree)) {
       std::vector<std::shared_ptr<PropertyNode>> properties =
           declaration->getProperties();
       std::shared_ptr<PropertyNode> property =
@@ -2374,6 +2418,76 @@ CodeAnalysis::TypeTree CodeAnalysis::getTypeTreeForFunctionInstance(
   return typeTree;
 }
 
+CodeAnalysis::NodeRole CodeAnalysis::determineNodeRole(
+    ASTNode block, std::shared_ptr<DeclarationNode> funcDecl,
+    const ScopeStack &scope, ASTNode tree,
+    std::shared_ptr<DeclarationNode> &outBlockDecl) {
+  auto blockName = ASTQuery::getNodeName(block);
+  auto funcType = ASTQuery::findTypeDeclaration(funcDecl, scope, tree);
+
+  if (ASTQuery::isCodeGenerator(funcType, scope, tree) &&
+      ASTQuery::isCallable(funcType, scope, tree)) {
+    auto mainOutputPort = ASTQuery::getModuleMainOutputPortBlock(funcDecl);
+    if (mainOutputPort) {
+      auto outputBlock = mainOutputPort->getPropertyValue("block");
+      auto outputBlockName = ASTQuery::getNodeName(outputBlock);
+      auto outputBlockDecl = ASTQuery::findDeclarationByName(
+          outputBlockName,
+          {{nullptr, funcDecl->getPropertyValue("blocks")->getChildren()}},
+          nullptr);
+      if (blockName == outputBlockName) {
+        outBlockDecl = outputBlockDecl;
+        return NodeRole::Output;
+      }
+    }
+    // TODO add secondary output ports
+
+    auto mainInputPort = ASTQuery::getModuleMainInputPortBlock(funcDecl);
+    if (mainInputPort) {
+      auto inputBlock = mainInputPort->getPropertyValue("block");
+      auto inputBlockName = ASTQuery::getNodeName(inputBlock);
+      auto inputBlockDecl = ASTQuery::findDeclarationByName(
+          inputBlockName,
+          {{nullptr, funcDecl->getPropertyValue("blocks")->getChildren()}},
+          nullptr);
+      if (blockName == inputBlockName) {
+        outBlockDecl = inputBlockDecl;
+        return NodeRole::Input;
+      }
+    }
+    // TODO secondary input ports
+
+    if (ASTQuery::isDomainMember(funcType, scope, tree)) {
+      ScopeStack outerScope;
+      if (scope.size() > 1) {
+        outerScope.push_back(scope.at(scope.size() - 2));
+      }
+      auto blockDecl = ASTQuery::findDeclarationByName(
+          ASTQuery::getNodeName(block), outerScope, tree);
+      if (blockDecl) { // If in scope it is an external block
+        outBlockDecl = blockDecl;
+        return NodeRole::External;
+      }
+    }
+    
+    // Blocks in modules are local unless marked as persistent
+    auto blockDecl = ASTQuery::findDeclarationByName(
+        ASTQuery::getNodeName(block), scope, nullptr);
+    if (blockDecl) { // If in scope it is an internal block
+      outBlockDecl = blockDecl;
+      auto persistentProp = blockDecl->getCompilerProperty("persistent");
+      if (persistentProp) {
+        return NodeRole::Persistent;
+      } else {
+        return NodeRole::Internal;
+      }
+    }
+  } else {
+    std::cerr << "Unexpected function type: " << funcDecl->toText() << std::endl;
+  }
+  return NodeRole::Unknown;
+}
+
 void CodeAnalysis::processStreamNode(ASTNode streamNode,
                                      const ScopeStack &scope, ASTNode tree,
                                      CodeAnalysis::TypeTree &typeTree) {
@@ -2474,88 +2588,41 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
 
         if (ASTQuery::isCodeGenerator(funcType, scope, tree) &&
             ASTQuery::isCallable(funcType, scope, tree)) {
-          auto mainOutputPort =
-              ASTQuery::getModuleMainOutputPortBlock(funcDecl);
-          if (mainOutputPort) {
-            auto outputBlock = mainOutputPort->getPropertyValue("block");
-            auto outputBlockName = ASTQuery::getNodeName(outputBlock);
-            auto outputBlockDecl = ASTQuery::findDeclarationByName(
-                outputBlockName,
-                {{nullptr,
-                  funcDecl->getPropertyValue("blocks")->getChildren()}},
-                nullptr);
-            if (blockName == outputBlockName) {
-              assert(outputBlock->getNodeType() == AST::Block);
-              auto type = resolveBlockDataType(
-                  std::static_pointer_cast<BlockNode>(outputBlock), {}, tree);
-              if (!typeTree.contains(blockName)) {
-                typeTree.output.push_back({outputBlockDecl, type});
-              }
-              return;
+          
+          std::shared_ptr<DeclarationNode> outBlockDecl;
+          NodeRole role = determineNodeRole(block, funcDecl, scope, tree, outBlockDecl);
+          
+          if (role == NodeRole::Output) {
+            auto type = resolveBlockDataType(block, {}, tree);
+            if (!typeTree.contains(blockName)) {
+              typeTree.output.push_back({outBlockDecl, type});
             }
-          }
-          // TODO add secondary output ports
-
-          auto mainInputPort = ASTQuery::getModuleMainInputPortBlock(funcDecl);
-          if (mainInputPort) {
-            auto inputBlock = mainInputPort->getPropertyValue("block");
-            auto inputBlockName = ASTQuery::getNodeName(inputBlock);
-            auto inputBlockDecl = ASTQuery::findDeclarationByName(
-                inputBlockName,
-                {{nullptr,
-                  funcDecl->getPropertyValue("blocks")->getChildren()}},
-                nullptr);
-            if (blockName == inputBlockName) {
-              assert(inputBlock->getNodeType() == AST::Block);
-              auto type = resolveBlockDataType(
-                  std::static_pointer_cast<BlockNode>(inputBlock), {}, tree);
-
-              if (!typeTree.contains(blockName)) {
-                typeTree.input.push_back({inputBlockDecl, type});
-              }
-              return;
+            return;
+          } else if (role == NodeRole::Input) {
+            auto type = resolveBlockDataType(block, {}, tree);
+            if (!typeTree.contains(blockName)) {
+              typeTree.input.push_back({outBlockDecl, type});
             }
-          }
-          // TODO secondary input ports
-
-          if (ASTQuery::isDomainMember(funcType, scope, tree)) {
-            // Reactions and Loops are domain members and they have access to
-            // the global and parent scope that are processed as external
-            ScopeStack outerScope;
-            if (scope.size() > 1) {
-              outerScope.push_back(scope.at(scope.size() - 2));
-            }
-            auto blockDecl = ASTQuery::findDeclarationByName(
-                ASTQuery::getNodeName(block), outerScope, tree);
-            if (blockDecl) { // If in scope it is an external block
-              auto type = resolveBlockDataType(block, scope, tree);
-              if (!typeTree.contains(blockName)) {
-                typeTree.external.push_back({blockDecl, type});
-                // We also need to ensure the block is registered in the
-                // parent scope, but we will do it in the parent because
-                // we don't have access to the parent tree here.
-              }
-              return;
-            }
-          }
-          // Blocks in modules are local unless marked as persistent
-          blockDecl = ASTQuery::findDeclarationByName(
-              ASTQuery::getNodeName(block), scope, nullptr);
-          if (blockDecl) { // If in scope it is an internal block
+            return;
+          } else if (role == NodeRole::External) {
             auto type = resolveBlockDataType(block, scope, tree);
             if (!typeTree.contains(blockName)) {
-              auto persistentProp =
-                  blockDecl->getCompilerProperty("persistent");
-              if (persistentProp) {
-                typeTree.persistent.push_back({blockDecl, type});
-              } else {
-                typeTree.internal.push_back({blockDecl, type});
-              }
-              return;
+              typeTree.external.push_back({outBlockDecl, type});
             }
+            return;
+          } else if (role == NodeRole::Persistent) {
+            auto type = resolveBlockDataType(block, scope, tree);
+            if (!typeTree.contains(blockName)) {
+              typeTree.persistent.push_back({outBlockDecl, type});
+            }
+            return;
+          } else if (role == NodeRole::Internal) {
+            auto type = resolveBlockDataType(block, scope, tree);
+            if (!typeTree.contains(blockName)) {
+              typeTree.internal.push_back({outBlockDecl, type});
+            }
+            return;
           }
-
-          // TODO add any remaining as external?
 
         } else {
           std::cerr << "Unexpected function type: " << funcDecl->toText()

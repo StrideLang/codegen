@@ -271,9 +271,7 @@ void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
     }
     if (node->getNodeType() == AST::Declaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
-      if (decl->getObjectType() == "module" ||
-          decl->getObjectType() == "reaction" ||
-          decl->getObjectType() == "loop") {
+      if (ASTQuery::isCodeGenerator(decl, scope, m_tree)) {
         if (decl->getPropertyValue("blocks") &&
             decl->getPropertyValue("ports")) {
           auto blocks = decl->getPropertyValue("blocks")->getChildren();

@@ -99,6 +99,9 @@ public:
   static std::vector<std::shared_ptr<PortPropertyNode>>
   getUsedPortPropertiesInNode(ASTNode node);
 
+  static std::vector<ASTNode> getUsedBlocksInNode(ASTNode node);
+
+
   // //
 
   // Input and output size
@@ -165,6 +168,15 @@ public:
   matchDefinitionToTypes(std::vector<std::shared_ptr<DeclarationNode>> decls,
                          std::shared_ptr<FunctionNode> func,
                          const ScopeStack &scope = {}, ASTNode tree = nullptr);
+
+  enum class NodeRole { Input, Output, Internal, Persistent, External, Unknown };
+
+  static NodeRole determineNodeRole(ASTNode block,
+                                    std::shared_ptr<DeclarationNode> funcDecl,
+                                    const ScopeStack &scope, ASTNode tree,
+                                    std::shared_ptr<DeclarationNode> &outBlockDecl);
+
+  static std::vector<ASTNode> getUsedBlocksInStreams(std::shared_ptr<DeclarationNode> funcDecl);
 
   using DataInfo = std::pair<ASTNode, std::string>; // Instance, Type
   struct TypeTree {
