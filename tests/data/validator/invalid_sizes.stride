@@ -1,0 +1,19 @@
+module InvalidSizes {
+    ports: [
+        mainInputPort InputPort {
+            name: 'input'
+            block: Input
+        },
+        mainOutputPort OutputPort {
+            name: 'output'
+            block: Output
+        }
+    ]
+    blocks: [
+        signal Input[3] {},
+        signal Output[2] {}
+    ]
+    streams: [
+        Input >> Output;
+    ]
+}

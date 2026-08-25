@@ -52,7 +52,7 @@
 
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/propertynode.h"
-//#include "pythonproject.h"
+// #include "pythonproject.h"
 
 using namespace strd;
 
@@ -126,6 +126,8 @@ StrideSystem::StrideSystem(std::string strideRoot, std::string systemName,
                 << "Error parsing system tree in:" << systemFile << std::endl;
     }
   } else {
+    // TODO define error types and better error struct
+    m_errors.push_back("System not found");
     std::cerr << __FILE__ << ":" << __LINE__
               << " System file not found:" << systemFile << std::endl;
   }

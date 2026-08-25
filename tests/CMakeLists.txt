@@ -22,6 +22,8 @@ set(TEST_SOURCES
   resolver.cpp
   compiler_properties.cpp
   codeanalysis_tests.cpp
+  codevalidator_tests.cpp
+  stridesystem_tests.cpp
 )
 
 

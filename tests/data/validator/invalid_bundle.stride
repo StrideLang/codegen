@@ -1,0 +1,8 @@
+module InvalidBundle {
+    blocks: [
+        signal MyBundle[2] {}
+    ]
+    streams: [
+        MyBundle[3] >> MyBundle[0];
+    ]
+}

@@ -64,14 +64,13 @@ bool CodeValidator::isValid() { return m_errors.size() == 0; }
 
 void CodeValidator::validatePlatform(ASTNode tree,
                                      std::vector<LangError> &errors) {
-  for (const ASTNode &node : tree->getChildren()) {
-    if (node->getNodeType() == AST::Platform) {
-      std::shared_ptr<SystemNode> platformNode =
-          std::static_pointer_cast<SystemNode>(node);
-    }
-  }
   std::vector<std::shared_ptr<SystemNode>> systems =
       ASTQuery::getSystemNodes(tree);
+  if (systems.size() == 0) {
+    std::cout << __FILE__ << ":" << __LINE__ << "No system definition"
+              << std::endl;
+    return;
+  }
   std::shared_ptr<SystemNode> platformNode = systems.at(0);
 
   for (size_t i = 1; i < systems.size(); i++) {

@@ -2458,9 +2458,9 @@ CodeAnalysis::NodeRole CodeAnalysis::determineNodeRole(
     // TODO secondary input ports
 
     if (ASTQuery::isDomainMember(funcType, scope, tree)) {
-      ScopeStack outerScope;
-      if (scope.size() > 1) {
-        outerScope.push_back(scope.at(scope.size() - 2));
+      ScopeStack outerScope = scope;
+      if (outerScope.size() > 0) {
+        outerScope.pop_back();
       }
       auto blockDecl = ASTQuery::findDeclarationByName(
           ASTQuery::getNodeName(block), outerScope, tree);

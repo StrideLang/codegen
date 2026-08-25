@@ -22,4 +22,7 @@ module Test {
     ]
 }
 
+signal In {}
+signal Out {}
+
 In >> Test() >> Out;
