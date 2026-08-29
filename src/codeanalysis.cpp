@@ -67,7 +67,8 @@ ASTNode CodeAnalysis::getInstance(ASTNode block, ScopeStack scopeStack,
             "trigger" ||
         std::static_pointer_cast<DeclarationNode>(block)->getObjectType() ==
             "string" ||
-        ASTQuery::isConstant(std::static_pointer_cast<DeclarationNode>(block), scopeStack, tree)) {
+        ASTQuery::isConstant(std::static_pointer_cast<DeclarationNode>(block),
+                             scopeStack, tree)) {
       inst = block;
     } else if (std::static_pointer_cast<DeclarationNode>(block)
                    ->getObjectType() == "reaction") {
@@ -511,7 +512,8 @@ double CodeAnalysis::resolveRateToFloat(ASTNode rateNode, ScopeStack scope,
     std::shared_ptr<DeclarationNode> valueDeclaration =
         ASTQuery::findDeclarationByName(block->getName(), scope, tree,
                                         block->getNamespaceList());
-    if (valueDeclaration && ASTQuery::isConstant(valueDeclaration, scope, tree)) {
+    if (valueDeclaration &&
+        ASTQuery::isConstant(valueDeclaration, scope, tree)) {
       std::shared_ptr<PropertyNode> property = ASTQuery::findPropertyByName(
           valueDeclaration->getProperties(), "value");
       if (property) {
@@ -1305,11 +1307,11 @@ CodeAnalysis::getUsedPortPropertiesInNode(ASTNode node) {
   return used;
 }
 
-std::vector<ASTNode>
-CodeAnalysis::getUsedBlocksInNode(ASTNode node) {
+std::vector<ASTNode> CodeAnalysis::getUsedBlocksInNode(ASTNode node) {
   std::vector<ASTNode> used;
-  if (!node) return used;
-  
+  if (!node)
+    return used;
+
   if (node->getNodeType() == AST::Block || node->getNodeType() == AST::Bundle) {
     used.push_back(node);
     if (node->getNodeType() == AST::Bundle) {
@@ -1858,7 +1860,8 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
         return {std::make_shared<BlockNode>(
             getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       } else {
-        std::cerr << " Could not find type property in:" << decl->toText()
+        std::cerr << __FILE__ << ":" << __LINE__
+                  << " Could not find type property in:" << decl->toText()
                   << std::endl;
       }
     } else {
@@ -2362,12 +2365,8 @@ std::shared_ptr<DeclarationNode> CodeAnalysis::matchDefinitionToTypes(
           std::vector<ASTNode> streamInNodes;
           if (streamInput->getNodeType() == AST::List) {
             streamInNodes = streamInput->getChildren();
-          } else if (streamInput->getNodeType() == AST::Block) {
-            streamInNodes.push_back(streamInput);
           } else {
-            matches = false;
-            std::cerr << " Unsupported input type for platform block: "
-                      << streamInput->toText() << std::endl;
+            streamInNodes.push_back(streamInput);
           }
           // TODO validate signature
           // auto types = CodeAnalysis::getInputDataTypes(func, scope, tree);
@@ -2469,7 +2468,7 @@ CodeAnalysis::NodeRole CodeAnalysis::determineNodeRole(
         return NodeRole::External;
       }
     }
-    
+
     // Blocks in modules are local unless marked as persistent
     auto blockDecl = ASTQuery::findDeclarationByName(
         ASTQuery::getNodeName(block), scope, nullptr);
@@ -2483,7 +2482,8 @@ CodeAnalysis::NodeRole CodeAnalysis::determineNodeRole(
       }
     }
   } else {
-    std::cerr << "Unexpected function type: " << funcDecl->toText() << std::endl;
+    std::cerr << "Unexpected function type: " << funcDecl->toText()
+              << std::endl;
   }
   return NodeRole::Unknown;
 }
@@ -2588,10 +2588,11 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
 
         if (ASTQuery::isCodeGenerator(funcType, scope, tree) &&
             ASTQuery::isCallable(funcType, scope, tree)) {
-          
+
           std::shared_ptr<DeclarationNode> outBlockDecl;
-          NodeRole role = determineNodeRole(block, funcDecl, scope, tree, outBlockDecl);
-          
+          NodeRole role =
+              determineNodeRole(block, funcDecl, scope, tree, outBlockDecl);
+
           if (role == NodeRole::Output) {
             auto type = resolveBlockDataType(block, {}, tree);
             if (!typeTree.contains(blockName)) {
