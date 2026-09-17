@@ -5,7 +5,7 @@ platformModule PlatformModule {
 #    linkTo: []
 #    declarations: ['']
     # initializations: ["// CPP Greater Init"]
-    processing: "fcmp ogt"
+    processing: "%%outtokens:0%% = llvm::fcmp ogt %%intokens:0%%, %%intokens:1%%"
     inherits: [_Signal]
 }
 
