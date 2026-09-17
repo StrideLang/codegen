@@ -392,6 +392,9 @@ void CodeResolver::markNodePersistence(ASTNode streamsList, ASTNode blocksList,
                 scope.push_back({funcDecl, blocksList->getChildren()});
               }
               markNodePersistence(streamsList, blocksList, scope, tree);
+              if (blocksList) {
+                scope.pop_back();
+              }
             }
           } else {
             std::cerr << "ERROR: Can't find declaration for: " << node->toText()
@@ -2107,9 +2110,12 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
       ASTNode mainPortsDefaultDomain;
       if (outputPortBlock) {
         ASTNode portBlock = outputPortBlock->getPropertyValue("block");
-        auto outputDomain = std::make_shared<PortPropertyNode>(
-            outputPortBlock->getName(), "domain", __FILE__, __LINE__);
-        mainPortsDefaultDomain = outputDomain;
+        ASTNode outputDomain;
+        if (!outputPortBlock->getCompilerProperty("anonymous")) {
+          outputDomain = std::make_shared<PortPropertyNode>(
+              outputPortBlock->getName(), "domain", __FILE__, __LINE__);
+          mainPortsDefaultDomain = outputDomain;
+        }
         // First give port a block and its declaration if it doesn't have
         // one.
         if (!portBlock || portBlock->getNodeType() == AST::None) {
@@ -2148,7 +2154,7 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
         ASTNode domainNode = CodeAnalysis::getNodeDomain(
             portBlock, {{node, internalBlocks->getChildren()}}, m_tree);
         if (!domainNode || domainNode->getNodeType() == AST::None) {
-          if (portBlockDecl) {
+          if (portBlockDecl && mainPortsDefaultDomain) {
             portBlockDecl->setPropertyValue("domain", mainPortsDefaultDomain);
           }
         }
@@ -2160,10 +2166,13 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
           ASTQuery::getModuleMainInputPortBlock(decl);
       if (inputPortBlock) {
         ASTNode portBlock = inputPortBlock->getPropertyValue("block");
-        auto inputDomain = std::make_shared<PortPropertyNode>(
-            inputPortBlock->getName(), "domain", __FILE__, __LINE__);
+        ASTNode inputDomain;
+        if (!inputPortBlock->getCompilerProperty("anonymous")) {
+          inputDomain = std::make_shared<PortPropertyNode>(
+              inputPortBlock->getName(), "domain", __FILE__, __LINE__);
+        }
 
-        if (!mainPortsDefaultDomain) { // If not set from output port, set
+        if (!mainPortsDefaultDomain && inputDomain) { // If not set from output port, set
                                        // here
           mainPortsDefaultDomain = inputDomain;
         }
@@ -2205,7 +2214,7 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
         ASTNode domainNode = CodeAnalysis::getNodeDomain(
             portBlock, {{node, internalBlocks->getChildren()}}, m_tree);
         if (!domainNode || domainNode->getNodeType() == AST::None) {
-          if (portBlockDecl &&
+          if (portBlockDecl && mainPortsDefaultDomain &&
               !ASTQuery::isConstant(portBlockDecl,
                                     {{node, internalBlocks->getChildren()}},
                                     m_tree)) {
@@ -2229,7 +2238,7 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
           // Properties that we need to auto-declare for
           ASTNode blockPortValue = portDeclaration->getPropertyValue("block");
           auto portDomain = portDeclaration->getPropertyValue("domain");
-          if (!portDomain) {
+          if (!portDomain && !portDeclaration->getCompilerProperty("anonymous")) {
             portDomain = std::make_shared<PortPropertyNode>(
                 portDeclaration->getName(), "domain", __FILE__, __LINE__);
           }
@@ -2287,7 +2296,9 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
                 if (inheritsDomainType) {
                   ASTNode blockDomain = blockDecl->getDomain();
                   if (!blockDomain || blockDomain->getNodeType() == AST::None) {
-                    blockDecl->setPropertyValue("domain", portDomain);
+                    if (portDomain) {
+                      blockDecl->setPropertyValue("domain", portDomain);
+                    }
                   }
                   if (!blockDecl->getPropertyValue("rate") ||
                       blockDecl->getPropertyValue("rate")->getNodeType() ==
@@ -3074,6 +3085,7 @@ void CodeResolver::setInputBlockForFunction(std::shared_ptr<FunctionNode> func,
         scopeStack.push_back({func, blocks});
         checkStreamConnections(std::static_pointer_cast<StreamNode>(stream),
                                scopeStack, nullptr);
+        scopeStack.pop_back();
       }
     }
   }
@@ -3106,6 +3118,7 @@ void CodeResolver::setOutputBlockForFunction(std::shared_ptr<FunctionNode> func,
         scopeStack.push_back({func, blocks});
         checkStreamConnections(std::static_pointer_cast<StreamNode>(stream),
                                scopeStack, nullptr);
+        scopeStack.pop_back();
       }
     }
   }

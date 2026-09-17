@@ -151,6 +151,8 @@ public:
                                           ASTNode tree);
   static std::string resolveNodeOutDataType(ASTNode node, ScopeStack scopeStack,
                                             ASTNode tree);
+  static std::string resolveNodeOutDataTypeInternal(ASTNode node, ScopeStack scopeStack,
+                                            ASTNode tree);
   static std::string resolveListDataType(ListNode *listnode,
                                          ScopeStack scopeStack, ASTNode tree);
   static std::string resolveExpressionDataType(ExpressionNode *exprnode,
@@ -199,6 +201,10 @@ public:
 
   static TypeTree getStateStructInformation(const ScopeStack &scope,
                                             ASTNode tree);
+                                            
+  static TypeTree getStateStructInformationForDeclaration(
+      std::shared_ptr<DeclarationNode> decl, const ScopeStack &scope,
+      ASTNode tree);
 
 private:
   static TypeTree
