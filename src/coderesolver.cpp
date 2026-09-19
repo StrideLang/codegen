@@ -174,13 +174,17 @@ void CodeResolver::processSystem() {
     // Add platform domain to ensure a minimal system is available
     auto platformDomain = m_system->getPlatformDomain();
     if (platformDomain) {
-      for (auto objects : m_system->getImportTrees()) {
-        auto domainDecl = ASTQuery::findDeclarationByName(
-            ASTQuery::getNodeName(platformDomain), {{nullptr, objects.second}},
-            m_tree);
-        if (domainDecl) {
-          m_tree->addChild(domainDecl);
-          break;
+      std::string domainName = ASTQuery::getNodeName(platformDomain);
+      auto existingDomain =
+          ASTQuery::findDeclarationByName(domainName, {}, m_tree);
+      if (!existingDomain) {
+        for (auto objects : m_system->getImportTrees()) {
+          auto domainDecl = ASTQuery::findDeclarationByName(
+              domainName, {{nullptr, objects.second}}, nullptr);
+          if (domainDecl) {
+            m_tree->addChild(domainDecl);
+            break;
+          }
         }
       }
     }

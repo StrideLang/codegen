@@ -411,3 +411,38 @@ TEST(CodeAnalysis, EvaluateSizePortProperty) {
   }
   EXPECT_TRUE(checked);
 }
+
+TEST(CodeAnalysis, StateStructInformationForDeclaration) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree = AST::parseFile(TESTS_SOURCE_DIR
+                                "codeanalysis/typetree_module_nested.stride");
+  ASSERT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto decl =
+      ASTQuery::findDeclarationByName("NestingMod", ScopeStack(), tree);
+  ASSERT_TRUE(decl != nullptr);
+
+  auto typeTree =
+      CodeAnalysis::getStateStructInformationForDeclaration(decl, ScopeStack(), tree);
+
+  EXPECT_EQ(typeTree.instance, decl);
+  ASSERT_EQ(typeTree.input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.input[0].first), "NestingModInput");
+  ASSERT_EQ(typeTree.output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.output[0].first), "NestingModOutput");
+  ASSERT_EQ(typeTree.internal.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.internal[0].first), "NestingModInternal");
+
+  ASSERT_EQ(typeTree.nodes.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].instance), "NestedMod");
+  ASSERT_EQ(typeTree.nodes[0].input.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].input[0].first), "NestedModInput");
+  ASSERT_EQ(typeTree.nodes[0].output.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].output[0].first), "NestedModOutput");
+  ASSERT_EQ(typeTree.nodes[0].internal.size(), 1);
+  EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].internal[0].first), "NestedModInternal");
+}

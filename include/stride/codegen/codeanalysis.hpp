@@ -213,6 +213,9 @@ private:
                                  int &instanceCounter);
   static void processStreamNode(ASTNode streamNode, const ScopeStack &scope,
                                 ASTNode tree, TypeTree &typeTree);
+  static void processStreamNodeForDeclaration(
+      ASTNode node, std::shared_ptr<DeclarationNode> funcDecl,
+      const ScopeStack &funcScope, ASTNode tree, TypeTree &typeTree);
 };
 } // namespace strd
 
