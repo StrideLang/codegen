@@ -1018,7 +1018,8 @@ void CodeResolver::analyzeConnections() {
     if (node->getNodeType() == AST::Declaration) {
       std::shared_ptr<DeclarationNode> decl =
           std::static_pointer_cast<DeclarationNode>(node);
-      if (decl->getObjectType() == "_domainDefinition") {
+      if (decl->getObjectType() == "_domainDefinition" ||
+          decl->getObjectType() == "gameDefinition") {
         knownDomains.push_back(decl);
         assert(!decl->getCompilerProperty("domainReads"));
         assert(!decl->getCompilerProperty("domainWrites"));
@@ -2176,8 +2177,8 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
               inputPortBlock->getName(), "domain", __FILE__, __LINE__);
         }
 
-        if (!mainPortsDefaultDomain && inputDomain) { // If not set from output port, set
-                                       // here
+        if (!mainPortsDefaultDomain && inputDomain) { // If not set from output
+                                                      // port, set here
           mainPortsDefaultDomain = inputDomain;
         }
         // First give port a block and its declaration if it doesn't have
@@ -2242,7 +2243,8 @@ void CodeResolver::declareInternalBlocksForNode(ASTNode node,
           // Properties that we need to auto-declare for
           ASTNode blockPortValue = portDeclaration->getPropertyValue("block");
           auto portDomain = portDeclaration->getPropertyValue("domain");
-          if (!portDomain && !portDeclaration->getCompilerProperty("anonymous")) {
+          if (!portDomain &&
+              !portDeclaration->getCompilerProperty("anonymous")) {
             portDomain = std::make_shared<PortPropertyNode>(
                 portDeclaration->getName(), "domain", __FILE__, __LINE__);
           }
