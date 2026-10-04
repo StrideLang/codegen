@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdio>
 #include <iostream>
+#include <set>
 
 using namespace strd;
 
@@ -142,7 +143,7 @@ CodeAnalysis::findDomainDeclaration(std::string domainName,
               return decl;
             }
           }
-          if (framework.size() == 0 && !domainDeclFramework) {
+          if (framework.size() == 0) {
             return decl;
           }
         }
@@ -685,23 +686,29 @@ int CodeAnalysis::numParallelStreams(StreamNode *stream, StrideSystem &platform,
   return numParallel;
 }
 
-std::shared_ptr<DeclarationNode>
-CodeAnalysis::resolveConnectionBlock(ASTNode node, ScopeStack scopeStack,
-                                     ASTNode tree, bool downStream) {
-  std::cout << "DEBUG: resolveConnectionBlock for "
-            << (node ? node->toText() : "null") << " downStream=" << downStream
-            << std::endl;
-  if (!node) {
+static std::shared_ptr<DeclarationNode>
+resolveConnectionBlockInternal(ASTNode node, ScopeStack scopeStack,
+                               ASTNode tree, bool downStream,
+                               std::set<const void *> &visited) {
+  if (!node || visited.count(node.get())) {
     return nullptr;
   }
+  visited.insert(node.get());
+
   if (node->getNodeType() == AST::Declaration) { // Signal
     return std::static_pointer_cast<DeclarationNode>(node);
+  } else if (node->getNodeType() == AST::Block ||
+             node->getNodeType() == AST::Bundle) {
+    return ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
+                                           scopeStack, tree);
   } else if (node->getNodeType() == AST::Function) {
     auto funcDecl = std::static_pointer_cast<DeclarationNode>(
         node->getCompilerProperty("declaration"));
     if (funcDecl) {
       auto ports = funcDecl->getPropertyValue("ports");
-      auto portDeclBlock = ASTQuery::getModuleMainOutputPortBlock(funcDecl);
+      auto portDeclBlock = downStream
+                               ? ASTQuery::getModuleMainOutputPortBlock(funcDecl)
+                               : ASTQuery::getModuleMainInputPortBlock(funcDecl);
       if (portDeclBlock) {
         auto portBlock = portDeclBlock->getPropertyValue("block");
         if (portBlock) {
@@ -737,10 +744,6 @@ CodeAnalysis::resolveConnectionBlock(ASTNode node, ScopeStack scopeStack,
                     if (portType == "mainOutputPort" && downStream) {
                       auto outerBlock =
                           node->getCompilerProperty("outputBlock");
-                      std::cout << "DEBUG: outputBlock for " << funcName
-                                << " is "
-                                << (outerBlock ? outerBlock->toText() : "null")
-                                << std::endl;
                       if (outerBlock) {
                         if (outerBlock->getNodeType() == AST::Block ||
                             outerBlock->getNodeType() == AST::Bundle) {
@@ -748,24 +751,31 @@ CodeAnalysis::resolveConnectionBlock(ASTNode node, ScopeStack scopeStack,
                               ASTQuery::getNodeName(outerBlock), scopeStack,
                               tree);
                           if (decl) {
-                            std::cout << "DEBUG: found decl for outputBlock in "
-                                         "scopeStack"
-                                      << std::endl;
                             return decl;
                           } else {
-                            std::cout << "DEBUG: could not find decl for "
-                                         "outputBlock in scopeStack"
-                                      << std::endl;
                             return std::shared_ptr<DeclarationNode>();
                           }
                         }
-                        return resolveConnectionBlock(outerBlock, scopeStack,
-                                                      tree, true);
+                        return resolveConnectionBlockInternal(
+                            outerBlock, scopeStack, tree, true, visited);
                       }
                     } else if (portType == "mainInputPort" && !downStream) {
                       auto outerBlock = node->getCompilerProperty("inputBlock");
-                      return resolveConnectionBlock(outerBlock, scopeStack,
-                                                    tree, false);
+                      if (outerBlock) {
+                        if (outerBlock->getNodeType() == AST::Block ||
+                            outerBlock->getNodeType() == AST::Bundle) {
+                          auto decl = ASTQuery::findDeclarationByName(
+                              ASTQuery::getNodeName(outerBlock), scopeStack,
+                              tree);
+                          if (decl) {
+                            return decl;
+                          } else {
+                            return std::shared_ptr<DeclarationNode>();
+                          }
+                        }
+                        return resolveConnectionBlockInternal(
+                            outerBlock, scopeStack, tree, false, visited);
+                      }
                     }
                   }
                 }
@@ -779,6 +789,14 @@ CodeAnalysis::resolveConnectionBlock(ASTNode node, ScopeStack scopeStack,
     }
   }
   return std::shared_ptr<DeclarationNode>();
+}
+
+std::shared_ptr<DeclarationNode>
+CodeAnalysis::resolveConnectionBlock(ASTNode node, ScopeStack scopeStack,
+                                     ASTNode tree, bool downStream) {
+  std::set<const void *> visited;
+  return resolveConnectionBlockInternal(node, scopeStack, tree, downStream,
+                                        visited);
 }
 
 ASTNode CodeAnalysis::getMatchedOuterInstance(
@@ -1869,6 +1887,9 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
   if (node->getNodeType() == AST::Block) {
     auto block = std::static_pointer_cast<BlockNode>(node);
     auto decl = ASTQuery::findDeclarationByName(block->getName(), scope, tree);
+    if (!decl && tree) {
+      decl = ASTQuery::findDeclarationByName(block->getName(), {}, tree);
+    }
     if (decl) {
       if (decl->getObjectType() == "signal") {
         // For now only resolve types for signals, perhaps in the future resolve
@@ -1892,11 +1913,19 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
   } else if (node->getNodeType() == AST::Bundle) {
     auto bundle = std::static_pointer_cast<BundleNode>(node);
     auto decl = ASTQuery::findDeclarationByName(bundle->getName(), scope, tree);
+    if (!decl && tree) {
+      decl = ASTQuery::findDeclarationByName(bundle->getName(), {}, tree);
+    }
     if (decl) {
       if (decl->getObjectType() == "signal") {
         // For now only resolve types for signals, perhaps in the future
         // resolve from all declarations that inherit from "Typed"
         return {getDataTypeForSignalDeclaration(decl)};
+      }
+      if (decl->getObjectType() == "switch" ||
+          decl->getObjectType() == "trigger") {
+        return {std::make_shared<BlockNode>(
+            getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       }
     } else {
       std::cerr << __FILE__ << ":" << __LINE__
@@ -1984,11 +2013,15 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
   if (node->getNodeType() == AST::Block) {
     auto block = std::static_pointer_cast<BlockNode>(node);
     auto decl = ASTQuery::findDeclarationByName(block->getName(), scope, tree);
+    if (!decl && tree) {
+      decl = ASTQuery::findDeclarationByName(block->getName(), {}, tree);
+    }
     if (decl) {
       if (decl->getObjectType() == "signal") {
         auto type = getDataTypeForSignalDeclaration(decl);
         return {type};
-      } else if (decl->getObjectType() == "switch") {
+      } else if (decl->getObjectType() == "switch" ||
+                 decl->getObjectType() == "trigger") {
         return {std::make_shared<BlockNode>("_SwitchType", __FILE__, __LINE__)};
       }
     } else {
@@ -1999,11 +2032,15 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
   } else if (node->getNodeType() == AST::Bundle) {
     auto bundle = std::static_pointer_cast<BundleNode>(node);
     auto decl = ASTQuery::findDeclarationByName(bundle->getName(), scope, tree);
+    if (!decl && tree) {
+      decl = ASTQuery::findDeclarationByName(bundle->getName(), {}, tree);
+    }
     if (decl) {
       if (decl->getObjectType() == "signal") {
         auto type = getDataTypeForSignalDeclaration(decl);
         return {type};
-      } else if (decl->getObjectType() == "switch") {
+      } else if (decl->getObjectType() == "switch" ||
+                 decl->getObjectType() == "trigger") {
         return {std::make_shared<BlockNode>("_SwitchType", __FILE__, __LINE__)};
       }
     } else {
@@ -2176,6 +2213,9 @@ std::string CodeAnalysis::resolveBundleDataType(BundleNode *bundle,
         return std::static_pointer_cast<BlockNode>(typeNode)->getName();
       }
       return "";
+    } else if (declaration->getObjectType() == "switch" ||
+               declaration->getObjectType() == "trigger") {
+      return "_SwitchType";
     }
   }
   return "";
@@ -2209,6 +2249,9 @@ std::string CodeAnalysis::resolveBlockDataType(ASTNode node,
         return std::static_pointer_cast<BlockNode>(typeNode)->getName();
       }
       return "";
+    } else if (declaration->getObjectType() == "switch" ||
+               declaration->getObjectType() == "trigger") {
+      return "_SwitchType";
     } else {
       return "";
     }

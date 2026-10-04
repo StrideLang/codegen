@@ -3070,31 +3070,6 @@ void CodeResolver::setInputBlockForFunction(std::shared_ptr<FunctionNode> func,
   if (previous) {
     func->setCompilerProperty("inputBlock", previous);
   }
-  std::vector<ASTNode> blocks;
-  auto funcDecl =
-      ASTQuery::findDeclarationByName(func->getName(), scopeStack, m_tree);
-  if (!funcDecl)
-    return;
-  auto blocksNode = funcDecl->getPropertyValue("blocks");
-  if (blocksNode) {
-    if (blocksNode->getNodeType() == AST::List) {
-      blocks = blocksNode->getChildren();
-    } else if (blocksNode->getNodeType() == AST::Declaration ||
-               blocksNode->getNodeType() == AST::BundleDeclaration) {
-      blocks.push_back(blocksNode);
-    }
-  }
-  auto streamsNode = funcDecl->getPropertyValue("streams");
-  if (streamsNode) {
-    for (const auto &stream : streamsNode->getChildren()) {
-      if (stream->getNodeType() == AST::Stream) {
-        scopeStack.push_back({func, blocks});
-        checkStreamConnections(std::static_pointer_cast<StreamNode>(stream),
-                               scopeStack, nullptr);
-        scopeStack.pop_back();
-      }
-    }
-  }
 }
 
 void CodeResolver::setOutputBlockForFunction(std::shared_ptr<FunctionNode> func,
@@ -3102,31 +3077,6 @@ void CodeResolver::setOutputBlockForFunction(std::shared_ptr<FunctionNode> func,
                                              ASTNode next) {
   if (next) {
     func->setCompilerProperty("outputBlock", next);
-  }
-  std::vector<ASTNode> blocks;
-  auto funcDecl =
-      ASTQuery::findDeclarationByName(func->getName(), scopeStack, m_tree);
-  if (!funcDecl)
-    return;
-  auto blocksNode = funcDecl->getPropertyValue("blocks");
-  if (blocksNode) {
-    if (blocksNode->getNodeType() == AST::List) {
-      blocks = blocksNode->getChildren();
-    } else if (blocksNode->getNodeType() == AST::Declaration ||
-               blocksNode->getNodeType() == AST::BundleDeclaration) {
-      blocks.push_back(blocksNode);
-    }
-  }
-  auto streamsNode = funcDecl->getPropertyValue("streams");
-  if (streamsNode) {
-    for (const auto &stream : streamsNode->getChildren()) {
-      if (stream->getNodeType() == AST::Stream) {
-        scopeStack.push_back({func, blocks});
-        checkStreamConnections(std::static_pointer_cast<StreamNode>(stream),
-                               scopeStack, nullptr);
-        scopeStack.pop_back();
-      }
-    }
   }
 }
 

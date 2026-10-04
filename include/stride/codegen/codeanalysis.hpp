@@ -1,10 +1,6 @@
 #ifndef CODEANALYSIS_HPP
 #define CODEANALYSIS_HPP
 
-#include <optional>
-
-#include "stride/parser/strideparser.h"
-
 #include "stridesystem.hpp"
 
 namespace strd {
@@ -101,7 +97,6 @@ public:
 
   static std::vector<ASTNode> getUsedBlocksInNode(ASTNode node);
 
-
   // //
 
   // Input and output size
@@ -151,8 +146,9 @@ public:
                                           ASTNode tree);
   static std::string resolveNodeOutDataType(ASTNode node, ScopeStack scopeStack,
                                             ASTNode tree);
-  static std::string resolveNodeOutDataTypeInternal(ASTNode node, ScopeStack scopeStack,
-                                            ASTNode tree);
+  static std::string resolveNodeOutDataTypeInternal(ASTNode node,
+                                                    ScopeStack scopeStack,
+                                                    ASTNode tree);
   static std::string resolveListDataType(ListNode *listnode,
                                          ScopeStack scopeStack, ASTNode tree);
   static std::string resolveExpressionDataType(ExpressionNode *exprnode,
@@ -171,14 +167,22 @@ public:
                          std::shared_ptr<FunctionNode> func,
                          const ScopeStack &scope = {}, ASTNode tree = nullptr);
 
-  enum class NodeRole { Input, Output, Internal, Persistent, External, Unknown };
+  enum class NodeRole {
+    Input,
+    Output,
+    Internal,
+    Persistent,
+    External,
+    Unknown
+  };
 
-  static NodeRole determineNodeRole(ASTNode block,
-                                    std::shared_ptr<DeclarationNode> funcDecl,
-                                    const ScopeStack &scope, ASTNode tree,
-                                    std::shared_ptr<DeclarationNode> &outBlockDecl);
+  static NodeRole
+  determineNodeRole(ASTNode block, std::shared_ptr<DeclarationNode> funcDecl,
+                    const ScopeStack &scope, ASTNode tree,
+                    std::shared_ptr<DeclarationNode> &outBlockDecl);
 
-  static std::vector<ASTNode> getUsedBlocksInStreams(std::shared_ptr<DeclarationNode> funcDecl);
+  static std::vector<ASTNode>
+  getUsedBlocksInStreams(std::shared_ptr<DeclarationNode> funcDecl);
 
   using DataInfo = std::pair<ASTNode, std::string>; // Instance, Type
   struct TypeTree {
@@ -201,10 +205,11 @@ public:
 
   static TypeTree getStateStructInformation(const ScopeStack &scope,
                                             ASTNode tree);
-                                            
-  static TypeTree getStateStructInformationForDeclaration(
-      std::shared_ptr<DeclarationNode> decl, const ScopeStack &scope,
-      ASTNode tree);
+
+  static TypeTree
+  getStateStructInformationForDeclaration(std::shared_ptr<DeclarationNode> decl,
+                                          const ScopeStack &scope,
+                                          ASTNode tree);
 
 private:
   static TypeTree
