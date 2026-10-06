@@ -66,8 +66,34 @@ StrideSystem::StrideSystem(std::string strideRoot, std::string systemName,
     std::cerr << __FILE__ << ":" << __LINE__ << " WARNING: No System specified"
               << std::endl;
   }
-  std::string versionString =
-      std::to_string(m_majorVersion) + "." + std::to_string(m_minorVersion);
+  std::string versionString;
+  if (m_majorVersion >= 0 && m_minorVersion >= 0) {
+    versionString =
+        std::to_string(m_majorVersion) + "." + std::to_string(m_minorVersion);
+  } else {
+    // Attempt to discover latest available version
+    std::filesystem::path sysDir(strideRoot + "/systems/" + systemName);
+    if (std::filesystem::exists(sysDir) && std::filesystem::is_directory(sysDir)) {
+      for (const auto &entry : std::filesystem::directory_iterator{sysDir}) {
+        if (entry.is_directory()) {
+          versionString = entry.path().filename().generic_string();
+        }
+      }
+    }
+    if (versionString.empty()) {
+      std::filesystem::path fwDir(strideRoot + "/frameworks/" + systemName);
+      if (std::filesystem::exists(fwDir) && std::filesystem::is_directory(fwDir)) {
+        for (const auto &entry : std::filesystem::directory_iterator{fwDir}) {
+          if (entry.is_directory()) {
+            versionString = entry.path().filename().generic_string();
+          }
+        }
+      }
+    }
+    if (versionString.empty()) {
+      versionString = "1.0";
+    }
+  }
 
   m_systemPath = std::filesystem::path(strideRoot + "/systems/" + systemName +
                                        "/" + versionString)
@@ -126,10 +152,21 @@ StrideSystem::StrideSystem(std::string strideRoot, std::string systemName,
                 << "Error parsing system tree in:" << systemFile << std::endl;
     }
   } else {
-    // TODO define error types and better error struct
-    m_errors.push_back("System not found");
-    std::cerr << __FILE__ << ":" << __LINE__
-              << " System file not found:" << systemFile << std::endl;
+    // Check if it's a single framework shortcut (e.g. use JIT version 1.0)
+    std::string fwPath = std::filesystem::path(strideRoot + "/frameworks/" +
+                                               systemName + "/" + versionString)
+                             .generic_string();
+    if (std::filesystem::exists(fwPath)) {
+      std::shared_ptr<StrideFramework> newPlatform =
+          std::make_shared<StrideFramework>(m_strideRoot, systemName,
+                                            versionString, "", "", systemName);
+      m_frameworks.push_back(newPlatform);
+    } else if (systemName.size() > 0) {
+      // TODO define error types and better error struct
+      m_errors.push_back("System not found");
+      std::cerr << __FILE__ << ":" << __LINE__
+                << " System file not found:" << systemFile << std::endl;
+    }
   }
 
   //    if (m_api == NullPlatform) {
@@ -144,10 +181,12 @@ StrideSystem::listAvailableSystems(std::string strideroot) {
   std::vector<std::string> outEntries;
   std::filesystem::path dir(strideroot);
   dir += "/systems";
-  for (auto const &dir_entry : std::filesystem::directory_iterator{dir}) {
-    std::cout << dir_entry << '\n';
-    if (dir_entry.is_directory()) {
-      outEntries.push_back(dir_entry.path().generic_string());
+  if (std::filesystem::exists(dir) && std::filesystem::is_directory(dir)) {
+    for (auto const &dir_entry : std::filesystem::directory_iterator{dir}) {
+      std::cout << dir_entry << '\n';
+      if (dir_entry.is_directory()) {
+        outEntries.push_back(dir_entry.path().generic_string());
+      }
     }
   }
   return outEntries;
@@ -342,23 +381,24 @@ std::vector<std::string> StrideSystem::listAvailableImports() {
   std::filesystem::path dir(m_strideRoot);
   dir += "/library/1.0";
   std::vector<std::string> outEntries;
-  for (auto entry : std::filesystem::directory_iterator{dir}) {
-    if (entry.is_directory()) {
-      outEntries.push_back(entry.path().generic_string());
+  if (std::filesystem::exists(dir) && std::filesystem::is_directory(dir)) {
+    for (auto entry : std::filesystem::directory_iterator{dir}) {
+      if (entry.is_directory()) {
+        outEntries.push_back(entry.path().generic_string());
+      }
     }
   }
   for (auto fw : m_frameworks) {
     dir = fw->buildPlatformLibPath();
-
-    for (auto entry : std::filesystem::directory_iterator{dir}) {
-
-      if (entry.is_directory()) {
-        if (entry.path().string().size() > 0 &&
-            ::isupper(entry.path().string()[0])) {
-
-          if (std::find(outEntries.begin(), outEntries.end(), entry.path()) ==
-              outEntries.end()) {
-            outEntries.push_back(entry.path().generic_string());
+    if (std::filesystem::exists(dir) && std::filesystem::is_directory(dir)) {
+      for (auto entry : std::filesystem::directory_iterator{dir}) {
+        if (entry.is_directory()) {
+          if (entry.path().string().size() > 0 &&
+              ::isupper(entry.path().filename().string()[0])) {
+            if (std::find(outEntries.begin(), outEntries.end(), entry.path()) ==
+                outEntries.end()) {
+              outEntries.push_back(entry.path().generic_string());
+            }
           }
         }
       }
@@ -736,50 +776,52 @@ std::vector<std::string> StrideSystem::getFrameworkNames() {
 std::vector<ASTNode> StrideSystem::getOptionTrees(std::string systemPath) {
   std::vector<ASTNode> optionTrees;
   auto platformPath = std::filesystem::path(systemPath + "/options");
-  for (auto file : std::filesystem::directory_iterator{platformPath}) {
-
-    if (file.is_regular_file() && file.path().extension() == ".stride") {
-      ASTNode optionTree =
-          AST::parseFile(file.path().generic_string().c_str(), nullptr);
-      if (optionTree) {
-        ASTNode finalTree = std::make_shared<AST>();
-        for (auto child : optionTree->getChildren()) {
-          bool osMatch = true;
-          if (child->getNodeType() == AST::Declaration) {
-            auto decl = std::static_pointer_cast<DeclarationNode>(child);
-            auto osNode = decl->getPropertyValue("buildPlatforms");
-            if (osNode && osNode->getNodeType() == AST::List) {
-              osMatch = false;
-              for (auto validOSNode : osNode->getChildren()) {
-                if (validOSNode->getNodeType() == AST::String) {
+  if (std::filesystem::exists(platformPath) &&
+      std::filesystem::is_directory(platformPath)) {
+    for (auto file : std::filesystem::directory_iterator{platformPath}) {
+      if (file.is_regular_file() && file.path().extension() == ".stride") {
+        ASTNode optionTree =
+            AST::parseFile(file.path().generic_string().c_str(), nullptr);
+        if (optionTree) {
+          ASTNode finalTree = std::make_shared<AST>();
+          for (auto child : optionTree->getChildren()) {
+            bool osMatch = true;
+            if (child->getNodeType() == AST::Declaration) {
+              auto decl = std::static_pointer_cast<DeclarationNode>(child);
+              auto osNode = decl->getPropertyValue("buildPlatforms");
+              if (osNode && osNode->getNodeType() == AST::List) {
+                osMatch = false;
+                for (auto validOSNode : osNode->getChildren()) {
+                  if (validOSNode->getNodeType() == AST::String) {
 
 #ifdef Q_OS_LINUX
-                  if (std::static_pointer_cast<ValueNode>(validOSNode)
-                          ->getStringValue() == "Linux") {
+                    if (std::static_pointer_cast<ValueNode>(validOSNode)
+                            ->getStringValue() == "Linux") {
 #elif defined(Q_OS_MACOS)
-                  if (std::static_pointer_cast<ValueNode>(validOSNode)
-                          ->getStringValue() == "macOS") {
+                    if (std::static_pointer_cast<ValueNode>(validOSNode)
+                            ->getStringValue() == "macOS") {
 #elif defined(Q_OS_WINDOWS)
-                  if (std::static_pointer_cast<ValueNode>(validOSNode)
-                          ->getStringValue() == "Windows") {
+                    if (std::static_pointer_cast<ValueNode>(validOSNode)
+                            ->getStringValue() == "Windows") {
 #else
-                  if (false) {
+                    if (false) {
 #endif
-                    osMatch = true;
-                    break;
+                      osMatch = true;
+                      break;
+                    }
                   }
                 }
               }
             }
+            if (osMatch) {
+              finalTree->addChild(child);
+            }
           }
-          if (osMatch) {
-            finalTree->addChild(child);
-          }
+          optionTrees.push_back(finalTree);
+        } else {
+          std::cerr << "Error parsing option file: " << file.path().c_str()
+                    << std::endl;
         }
-        optionTrees.push_back(finalTree);
-      } else {
-        std::cerr << "Error parsing option file: " << file.path().c_str()
-                  << std::endl;
       }
     }
   }
@@ -817,19 +859,20 @@ StrideSystem::getFrameworkSynchronization(std::string frameworkName) {
     if ((frameworkName == platform->getRootNamespace()) ||
         frameworkName == platform->getFramework()) {
       std::string platformPath = platform->buildPlatformLibPath();
-      for (const auto &file :
-           std::filesystem::directory_iterator{platformPath}) {
-
-        if (file.is_regular_file() && file.path().extension() == ".stride") {
-          auto newTree =
-              AST::parseFile(file.path().generic_string().c_str(), nullptr);
-          if (newTree) {
-            for (ASTNode node : newTree->getChildren()) {
-              if (node->getNodeType() == AST::Declaration) {
-                auto decl = std::static_pointer_cast<DeclarationNode>(node);
-                if (decl->getObjectType() == "synchronization") {
-
-                  syncNodes.push_back(decl);
+      if (std::filesystem::exists(platformPath) &&
+          std::filesystem::is_directory(platformPath)) {
+        for (const auto &file :
+             std::filesystem::directory_iterator{platformPath}) {
+          if (file.is_regular_file() && file.path().extension() == ".stride") {
+            auto newTree =
+                AST::parseFile(file.path().generic_string().c_str(), nullptr);
+            if (newTree) {
+              for (ASTNode node : newTree->getChildren()) {
+                if (node->getNodeType() == AST::Declaration) {
+                  auto decl = std::static_pointer_cast<DeclarationNode>(node);
+                  if (decl->getObjectType() == "synchronization") {
+                    syncNodes.push_back(decl);
+                  }
                 }
               }
             }

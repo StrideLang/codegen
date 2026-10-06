@@ -1,4 +1,4 @@
-﻿/*
+/*
     Stride is licensed under the terms of the 3-clause BSD license.
 
     Copyright (C) 2017. The Regents of the University of California.
@@ -430,19 +430,63 @@ StrideFramework::loadInheritedList(string frameworkLibPath) {
 std::vector<ASTNode> StrideFramework::loadImport(string importName,
                                                  string importAs) {
   std::vector<ASTNode> newNodes;
-  std::string includeSubPath = buildPlatformLibPath();
 
-  if (importName.size() > 0) {
-    includeSubPath += "/" + importName;
+  std::vector<std::string> segments;
+  size_t start = 0;
+  while (start < importName.size()) {
+    size_t pos = importName.find("::", start);
+    if (pos == std::string::npos) {
+      segments.push_back(importName.substr(start));
+      break;
+    }
+    segments.push_back(importName.substr(start, pos - start));
+    start = pos + 2;
   }
-  auto nodes = ASTFunctions::loadAllInDirectory(includeSubPath);
 
+  std::string relPath;
+  for (size_t i = 0; i < segments.size(); ++i) {
+    if (i > 0) {
+      relPath += "/";
+    }
+    relPath += segments[i];
+  }
+
+  auto loadFromLibDir = [&](const std::string &baseDir) {
+    std::vector<ASTNode> loaded;
+    if (relPath.empty()) {
+      return ASTFunctions::loadAllInDirectory(baseDir);
+    }
+    std::string filePath = baseDir + "/" + relPath + ".stride";
+    if (std::filesystem::exists(filePath) &&
+        std::filesystem::is_regular_file(filePath)) {
+      auto fileTree = AST::parseFile(filePath.c_str(), nullptr);
+      if (fileTree) {
+        for (const auto &child : fileTree->getChildren()) {
+          if (child->getNodeType() == AST::Declaration ||
+              child->getNodeType() == AST::BundleDeclaration) {
+            loaded.push_back(child);
+          }
+        }
+      }
+    }
+    std::string dirPath = baseDir + "/" + relPath;
+    if (std::filesystem::exists(dirPath) &&
+        std::filesystem::is_directory(dirPath)) {
+      auto dirNodes = ASTFunctions::loadAllInDirectory(dirPath);
+      for (const auto &dNode : dirNodes) {
+        loaded.push_back(dNode);
+      }
+    }
+    return loaded;
+  };
+
+  auto nodes = loadFromLibDir(buildPlatformLibPath());
   for (const auto &node : nodes) {
     newNodes.push_back(node);
   }
+
   for (const auto &inhPath : m_inheritedPaths) {
-    auto subPath = inhPath + "/" + importName;
-    auto inheritedNodes = ASTFunctions::loadAllInDirectory(subPath);
+    auto inheritedNodes = loadFromLibDir(inhPath);
     for (auto inhNode : inheritedNodes) {
       for (auto node = nodes.begin(); node != nodes.end(); node++) {
         if (ASTQuery::getNodeName(*node) == ASTQuery::getNodeName(inhNode)) {
@@ -455,23 +499,25 @@ std::vector<ASTNode> StrideFramework::loadImport(string importName,
           break;
         }
       }
-      // TODO this might cause issues if there are multiply defined names within
-      // the inherited framework. This would be an error within the framework
-      // itself that needs to be reported.
       newNodes.push_back(inhNode);
     }
   }
-  for (auto newNode : nodes) {
+
+  for (auto newNode : newNodes) {
     if (getRootNamespace().size() > 0) {
-      assert(!newNode->getCompilerProperty("namespaceTree"));
-      newNode->appendToPropertyValue(
-          "namespaceTree",
+      if (!newNode->getCompilerProperty("namespaceTree")) {
+        newNode->appendToPropertyValue(
+            "namespaceTree",
+            std::make_shared<ValueNode>(getRootNamespace(), __FILE__, __LINE__));
+      }
+    }
+    if (!newNode->getCompilerProperty("framework")) {
+      newNode->setCompilerProperty(
+          "framework",
           std::make_shared<ValueNode>(getRootNamespace(), __FILE__, __LINE__));
     }
-    newNode->setCompilerProperty(
-        "framework",
-        std::make_shared<ValueNode>(getRootNamespace(), __FILE__, __LINE__));
   }
+
   for (auto &importTree : m_trees) {
     if (importTree.importAs == importAs) {
       importTree.nodes.insert(importTree.nodes.end(), newNodes.begin(),
@@ -480,6 +526,10 @@ std::vector<ASTNode> StrideFramework::loadImport(string importName,
     }
   }
 
-  m_trees.push_back(FrameworkTree{importName, importAs, newNodes, {}});
+  std::vector<std::string> namespaces;
+  if (!importAs.empty()) {
+    namespaces.push_back(importAs);
+  }
+  m_trees.push_back(FrameworkTree{importName, importAs, newNodes, namespaces});
   return newNodes;
 }

@@ -10,16 +10,30 @@ TEST(StrideSystem, Initialize) {
     
     // Test listAvailableSystems
     auto systems = StrideSystem::listAvailableSystems(strideRoot);
-    // Assuming there is at least one system available (like "DesktopAudio" or similar)
-    // If not, we just check it doesn't crash
     EXPECT_GE(systems.size(), 0);
 
-    // Initialize with a dummy or existing system if possible, but for a basic test:
-    // StrideSystem system(strideRoot, "TestSystem", 1, 0, {});
-    // Since "TestSystem" might not exist, it might produce errors but shouldn't crash.
+    // Non existent system should record error
     StrideSystem system(strideRoot, "NonExistentSystem", 1, 0, {});
     
     auto errors = system.getErrors();
-    // Should have an error about system not found
     EXPECT_GT(errors.size(), 0);
+}
+
+TEST(StrideSystem, EmptySystemName) {
+    std::string strideRoot = ASTFunctions::getDefaultStrideRoot();
+    StrideSystem system(strideRoot, "", -1, -1, {});
+    EXPECT_EQ(system.systemName(), "");
+    EXPECT_EQ(system.getErrors().size(), 0);
+}
+
+TEST(StrideSystem, SafeOperationsOnEmpty) {
+    std::string strideRoot = ASTFunctions::getDefaultStrideRoot();
+    StrideSystem system(strideRoot, "", -1, -1, {});
+    
+    EXPECT_NO_THROW({
+        auto imports = system.listAvailableImports();
+        auto errors = system.getErrors();
+        auto warnings = system.getWarnings();
+        auto names = system.getFrameworkNames();
+    });
 }
