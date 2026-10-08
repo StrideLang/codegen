@@ -1,4 +1,4 @@
-﻿/*
+/*
     Stride is licensed under the terms of the 3-clause BSD license.
 
     Copyright (C) 2017. The Regents of the University of California.
@@ -123,10 +123,11 @@ void CodeValidator::validate() {
 void CodeValidator::validateBundleIndeces(ASTNode node,
                                           std::vector<LangError> &errors,
                                           ScopeStack scope) {
-  if (node->getNodeType() == AST::Bundle) {
-    BundleNode *bundle = static_cast<BundleNode *>(node.get());
+  if (node->getNodeType() == AST::Array || node->getNodeType() == AST::Bundle) {
+    ArrayNode *bundle = static_cast<ArrayNode *>(node.get());
     auto index = bundle->index();
     if (index->getNodeType() != AST::Int &&
+        index->getNodeType() != AST::MemberAccess &&
         index->getNodeType() != AST::PortProperty &&
         index->getNodeType() != AST::Range &&
         index->getNodeType() != AST::List) {
@@ -139,7 +140,7 @@ void CodeValidator::validateBundleIndeces(ASTNode node,
   }
   for (ASTNode child : node->getChildren()) {
     std::vector<ASTNode> blocksInScope =
-        CodeAnalysis::getBlocksInScope(child, scope, m_tree);
+        CodeAnalysis::getEntitiesInScope(child, scope, m_tree);
     auto subScope = scope;
     subScope.push_back({child, blocksInScope});
     validateBundleIndeces(child, errors, subScope);
@@ -149,18 +150,19 @@ void CodeValidator::validateBundleIndeces(ASTNode node,
 void CodeValidator::validateBundleSizes(ASTNode node,
                                         std::vector<LangError> &errors,
                                         ScopeStack scope) {
-  if (node->getNodeType() == AST::BundleDeclaration) {
+  if (node->getNodeType() == AST::ArrayDeclaration ||
+      node->getNodeType() == AST::BundleDeclaration) {
     std::shared_ptr<DeclarationNode> declaration =
         std::static_pointer_cast<DeclarationNode>(node);
-    // FIXME this needs to be rewritten looking at the port block size
+    // FIXME this needs to be rewritten looking at the port entity size
     int size =
         ASTQuery::getBlockDeclaredSize(declaration, scope, m_tree, &errors);
-    int datasize = getBlockDataSize(declaration, scope, &errors);
+    int datasize = getEntityDataSize(declaration, scope, &errors);
     if (size != datasize && datasize > 1) {
       LangError error;
       error.type = LangError::BundleSizeMismatch;
       error.lineNumber = node->getLine();
-      error.errorTokens.push_back(declaration->getBundle()->getName());
+      error.errorTokens.push_back(declaration->getArrayIndex()->getName());
       error.errorTokens.push_back(std::to_string(size));
       error.errorTokens.push_back(std::to_string(datasize));
       errors.push_back(error);
@@ -189,10 +191,12 @@ void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
     for (ASTNode sibling : singleScope.second) {
       std::string nodeName, siblingName;
       if (sibling->getNodeType() == AST::Declaration ||
+          sibling->getNodeType() == AST::ArrayDeclaration ||
           sibling->getNodeType() == AST::BundleDeclaration) {
         siblingName = static_cast<DeclarationNode *>(sibling.get())->getName();
       }
       if (node->getNodeType() == AST::Declaration ||
+          node->getNodeType() == AST::ArrayDeclaration ||
           node->getNodeType() == AST::BundleDeclaration) {
         nodeName = static_cast<DeclarationNode *>(node.get())->getName();
       }
@@ -226,7 +230,7 @@ void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
               break;
             }
           }
-          // Checkt if _at matches
+          // Check if _at matches
           auto nodeAt = node->getCompilerProperty("_at");
           auto siblingAt = sibling->getCompilerProperty("_at");
           bool atMatches = false;
@@ -337,6 +341,7 @@ void CodeValidator::validateConstraints(ASTNode tree) {
 
 void CodeValidator::validateNodeRate(ASTNode node, ASTNode tree) {
   if (node->getNodeType() == AST::Declaration ||
+      node->getNodeType() == AST::ArrayDeclaration ||
       node->getNodeType() == AST::BundleDeclaration) {
     DeclarationNode *decl = static_cast<DeclarationNode *>(node.get());
     if (decl->getObjectType() == "signal") {
@@ -459,17 +464,18 @@ std::vector<ASTNode> CodeValidator::resolveConstraintNode(
     std::shared_ptr<FunctionNode> function,
     std::shared_ptr<DeclarationNode> declaration, ScopeStack scopeStack,
     ASTNode tree) {
-  if (node->getNodeType() == AST::PortProperty) {
-    auto pp = std::static_pointer_cast<PortPropertyNode>(node);
-    if (pp->getPortName() == "size") {
+  if (node->getNodeType() == AST::MemberAccess ||
+      node->getNodeType() == AST::PortProperty) {
+    auto pp = std::static_pointer_cast<MemberAccessNode>(node);
+    if (pp->getPropertyName() == "size") {
       return {std::make_shared<ValueNode>(
-          (int64_t)CodeAnalysis::evaluateSizePortProperty(
-              pp->getName(), scopeStack, declaration, function, tree),
+          (int64_t)CodeAnalysis::evaluateSizeMemberAccess(
+              pp->getEntity(), scopeStack, declaration, function, tree),
           __FILE__, __LINE__)};
     }
-    if (pp->getPortName() == "rate") {
+    if (pp->getPropertyName() == "rate") {
       return {std::make_shared<ValueNode>(
-          CodeAnalysis::evaluateRatePortProperty(pp->getName(), scopeStack,
+          CodeAnalysis::evaluateRateMemberAccess(pp->getEntity(), scopeStack,
                                                  declaration, function, tree),
           __FILE__, __LINE__)};
     } else {
@@ -493,7 +499,8 @@ std::vector<ASTNode> CodeValidator::resolveConstraintNode(
       m_errors.push_back(err);
     }
     return output;
-  } else if (node->getNodeType() == AST::Block) {
+  } else if (node->getNodeType() == AST::Entity ||
+             node->getNodeType() == AST::Block) {
 
   } else if (node->getNodeType() == AST::List) {
     std::vector<ASTNode> resolvedList;
@@ -555,7 +562,7 @@ void CodeValidator::validateStreamInputSize(StreamNode *stream,
 
   } else {
     if (leftOutSize == -2 || rightInSize == -2) {
-      // FIXME Hack while calculation of port portperties size is implemented
+      // FIXME Hack while calculation of port member access size is implemented
     } else {
       if ((leftOutSize != rightInSize &&
            ((int)(rightInSize / (double)leftOutSize)) !=
@@ -579,7 +586,7 @@ void CodeValidator::validateStreamInputSize(StreamNode *stream,
   }
 }
 
-int CodeValidator::getBlockDataSize(
+int CodeValidator::getEntityDataSize(
     std::shared_ptr<DeclarationNode> declaration, ScopeStack scope,
     std::vector<LangError> *errors) {
   std::vector<std::shared_ptr<PropertyNode>> ports =

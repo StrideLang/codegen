@@ -228,9 +228,10 @@ void StrideSystem::parseSystemTree(ASTNode systemTree, ASTNode configuration) {
         } else if (platforms->getNodeType() == AST::List) {
           ListNode *platformsList = static_cast<ListNode *>(platforms.get());
           for (const ASTNode &platformName : platformsList->getChildren()) {
-            assert(platformName->getNodeType() == AST::Block);
+            assert(platformName->getNodeType() == AST::Entity ||
+                   platformName->getNodeType() == AST::Block);
             auto platformSpecBlock =
-                std::static_pointer_cast<BlockNode>(platformName);
+                std::static_pointer_cast<EntityNode>(platformName);
             auto platformSpec = ASTQuery::findDeclarationByName(
                 platformSpecBlock->getName(), {}, systemTree);
             if (platformSpec) {
@@ -281,9 +282,10 @@ void StrideSystem::parseSystemTree(ASTNode systemTree, ASTNode configuration) {
         std::shared_ptr<DeclarationNode> declaration =
             std::static_pointer_cast<DeclarationNode>(systemNode);
         if (declaration->getObjectType() == "platform") {
-          if (sourcePlatform->getNodeType() == AST::Block) {
+          if (sourcePlatform->getNodeType() == AST::Entity ||
+              sourcePlatform->getNodeType() == AST::Block) {
             if (declaration->getName() ==
-                std::static_pointer_cast<BlockNode>(sourcePlatform)
+                std::static_pointer_cast<EntityNode>(sourcePlatform)
                     ->getName()) {
               connection->replacePropertyValue(
                   "sourceFramework",
@@ -297,9 +299,10 @@ void StrideSystem::parseSystemTree(ASTNode systemTree, ASTNode configuration) {
                          "for connection "
                       << connection->getName() << std::endl;
           }
-          if (destPlatform->getNodeType() == AST::Block) {
+          if (destPlatform->getNodeType() == AST::Entity ||
+              destPlatform->getNodeType() == AST::Block) {
             if (declaration->getName() ==
-                std::static_pointer_cast<BlockNode>(destPlatform)->getName()) {
+                std::static_pointer_cast<EntityNode>(destPlatform)->getName()) {
               connection->replacePropertyValue(
                   "destinationFramework",
                   declaration->getPropertyValue("framework"));
@@ -665,9 +668,10 @@ StrideSystem::getFrameworkTools(std::string namespaceName) {
           std::static_pointer_cast<DeclarationNode>(object);
       if (decl->getObjectType() == "toolRequirement") {
         auto toolInstanceNode = decl->getPropertyValue("toolInstance");
-        if (toolInstanceNode && toolInstanceNode->getNodeType() == AST::Block) {
+        if (toolInstanceNode && (toolInstanceNode->getNodeType() == AST::Entity ||
+                                 toolInstanceNode->getNodeType() == AST::Block)) {
           auto toolInstance =
-              std::static_pointer_cast<BlockNode>(toolInstanceNode)->getName();
+              std::static_pointer_cast<EntityNode>(toolInstanceNode)->getName();
           if (toolManager.localTools.find(toolInstance) !=
               toolManager.localTools.end()) {
 
@@ -703,9 +707,10 @@ StrideSystem::getFrameworkPaths(std::string namespaceName) {
           std::static_pointer_cast<DeclarationNode>(object);
       if (decl->getObjectType() == "pathRequirement") {
         auto toolInstanceNode = decl->getPropertyValue("pathInstance");
-        if (toolInstanceNode && toolInstanceNode->getNodeType() == AST::Block) {
+        if (toolInstanceNode && (toolInstanceNode->getNodeType() == AST::Entity ||
+                                 toolInstanceNode->getNodeType() == AST::Block)) {
           auto pathInstance =
-              std::static_pointer_cast<BlockNode>(toolInstanceNode)->getName();
+              std::static_pointer_cast<EntityNode>(toolInstanceNode)->getName();
           if (toolManager.localPaths.find(pathInstance) !=
               toolManager.localPaths.end()) {
 
@@ -947,7 +952,7 @@ StrideSystem::getFrameworkAliasInherits(std::string frameworkAlias) {
 std::string StrideSystem::getDataType(ASTNode node, const ScopeStack &scope,
                                       ASTNode tree) {
   for (const auto &child : tree->getChildren()) {
-    if (child->getNodeType() == AST::Block) {
+    if (child->getNodeType() == AST::Entity || child->getNodeType() == AST::Block) {
       std::string domainId = CodeAnalysis::getDomainIdentifier(node, {}, tree);
       auto frameworkName = CodeAnalysis::getFrameworkForDomain(domainId, tree);
       frameworkName = getFrameworkAlias(frameworkName);
@@ -1022,7 +1027,7 @@ void StrideSystem::generateDomainConnections(ASTNode tree) {
               auto newWrites = std::make_shared<ListNode>(__FILE__, __LINE__);
               for (auto w : writes->getChildren()) {
                 auto writeDomain =
-                    std::static_pointer_cast<BlockNode>(w)->getName();
+                    std::static_pointer_cast<EntityNode>(w)->getName();
                 if (w->getScopeLevels() > 0) {
                   writeDomain = w->getScopeAt(0) + "::" + writeDomain;
                 }
@@ -1461,7 +1466,8 @@ std::string StrideSystem::findDefaultDataTypeInPath(std::string path,
           if (defaultNode->getNodeType() == AST::String) {
             return std::static_pointer_cast<ValueNode>(defaultNode)
                 ->getStringValue();
-          } else if (defaultNode->getNodeType() == AST::Block) {
+          } else if (defaultNode->getNodeType() == AST::Entity ||
+                     defaultNode->getNodeType() == AST::Block) {
             return ASTQuery::getNodeName(defaultNode);
           }
         }

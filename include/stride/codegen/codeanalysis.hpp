@@ -6,13 +6,17 @@
 namespace strd {
 class CodeAnalysis {
 public:
-  enum { SIZE_UNKNOWN = -1, SIZE_PORT_PROPERTY = -2 };
+  enum {
+    SIZE_UNKNOWN = -1,
+    SIZE_MEMBER_ACCESS = -2,
+    SIZE_PORT_PROPERTY = SIZE_MEMBER_ACCESS
+  };
   // Global tree analysis
   static std::vector<std::string> getUsedDomains(ASTNode tree);
   static std::vector<std::string> getUsedFrameworks(ASTNode tree);
 
-  // Get instance. For blocks the declaration is the instance, for modules it is
-  // the function node in the stream Many properties need to be stored in the
+  // Get instance. For entities the declaration is the instance, for modules it
+  // is the function node in the stream Many properties need to be stored in the
   // instance.
   static ASTNode getInstance(ASTNode block, ScopeStack scopeStack,
                              ASTNode tree);
@@ -64,8 +68,13 @@ public:
                                 std::vector<LangError> *errors = nullptr);
 
   static std::shared_ptr<DeclarationNode>
+  resolveConnectionEntity(ASTNode node, ScopeStack scopeStack, ASTNode tree,
+                          bool downStream = true);
+  static std::shared_ptr<DeclarationNode>
   resolveConnectionBlock(ASTNode node, ScopeStack scopeStack, ASTNode tree,
-                         bool downStream = true);
+                         bool downStream = true) {
+    return resolveConnectionEntity(node, scopeStack, tree, downStream);
+  }
 
   //
   static ASTNode
@@ -75,27 +84,59 @@ public:
                           ScopeStack scopeStack, ASTNode tree);
 
   static std::vector<ASTNode>
-  getBlocksInScope(ASTNode root, ScopeStack scopeStack, ASTNode tree);
-  // Evaluate value of port property (size and rate)
-  static int evaluateSizePortProperty(std::string targetPortName,
+  getEntitiesInScope(ASTNode root, ScopeStack scopeStack, ASTNode tree);
+  static std::vector<ASTNode>
+  getBlocksInScope(ASTNode root, ScopeStack scopeStack, ASTNode tree) {
+    return getEntitiesInScope(root, scopeStack, tree);
+  }
+
+  // Evaluate value of member access / port property (size and rate)
+  static int evaluateSizeMemberAccess(std::string targetPortName,
                                       ScopeStack scopeStack,
                                       std::shared_ptr<DeclarationNode> decl,
                                       std::shared_ptr<FunctionNode> func,
                                       ASTNode tree);
+  static int evaluateSizePortProperty(std::string targetPortName,
+                                      ScopeStack scopeStack,
+                                      std::shared_ptr<DeclarationNode> decl,
+                                      std::shared_ptr<FunctionNode> func,
+                                      ASTNode tree) {
+    return evaluateSizeMemberAccess(targetPortName, scopeStack, decl, func,
+                                    tree);
+  }
 
-  static double evaluateRatePortProperty(std::string targetPortName,
+  static double evaluateRateMemberAccess(std::string targetPortName,
                                          ScopeStack scopeStack,
                                          std::shared_ptr<DeclarationNode> decl,
                                          std::shared_ptr<FunctionNode> func,
                                          ASTNode tree);
+  static double evaluateRatePortProperty(std::string targetPortName,
+                                         ScopeStack scopeStack,
+                                         std::shared_ptr<DeclarationNode> decl,
+                                         std::shared_ptr<FunctionNode> func,
+                                         ASTNode tree) {
+    return evaluateRateMemberAccess(targetPortName, scopeStack, decl, func,
+                                    tree);
+  }
 
-  static std::vector<std::shared_ptr<PortPropertyNode>>
-  getUsedPortProperties(std::shared_ptr<DeclarationNode> funcDecl);
+  static std::vector<std::shared_ptr<MemberAccessNode>>
+  getUsedMemberAccesses(std::shared_ptr<DeclarationNode> funcDecl);
+  static std::vector<std::shared_ptr<MemberAccessNode>>
+  getUsedPortProperties(std::shared_ptr<DeclarationNode> funcDecl) {
+    return getUsedMemberAccesses(funcDecl);
+  }
 
-  static std::vector<std::shared_ptr<PortPropertyNode>>
-  getUsedPortPropertiesInNode(ASTNode node);
+  static std::vector<std::shared_ptr<MemberAccessNode>>
+  getUsedMemberAccessesInNode(ASTNode node);
+  static std::vector<std::shared_ptr<MemberAccessNode>>
+  getUsedPortPropertiesInNode(ASTNode node) {
+    return getUsedMemberAccessesInNode(node);
+  }
 
-  static std::vector<ASTNode> getUsedBlocksInNode(ASTNode node);
+  static std::vector<ASTNode> getUsedEntitiesInNode(ASTNode node);
+  static std::vector<ASTNode> getUsedBlocksInNode(ASTNode node) {
+    return getUsedEntitiesInNode(node);
+  }
 
   // //
 
@@ -106,9 +147,8 @@ public:
   static int getNodeNumInputs(ASTNode node, ScopeStack scope, ASTNode tree,
                               std::vector<LangError> *errors = nullptr);
 
-  // A value of -1 means undefined. -2 means set from port property.
-  // FIXME determine the size set by port properties to provide an accurate
-  // size.
+  // A value of -1 means undefined. -2 means set from member access / port
+  // property.
   static int
   getTypeNumOutputs(std::shared_ptr<DeclarationNode> blockDeclaration,
                     const ScopeStack &scope, ASTNode tree,
@@ -139,11 +179,12 @@ public:
   getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
                             const ScopeStack &scope, ASTNode tree);
 
-  [[deprecated("Use resolveBlockDataType() instead.")]]
-  static std::string resolveBundleDataType(BundleNode *bundle,
-                                           ScopeStack scopeStack, ASTNode tree);
+  static std::string resolveEntityDataType(ASTNode name, ScopeStack scopeStack,
+                                           ASTNode tree);
   static std::string resolveBlockDataType(ASTNode name, ScopeStack scopeStack,
-                                          ASTNode tree);
+                                          ASTNode tree) {
+    return resolveEntityDataType(name, scopeStack, tree);
+  }
   static std::string resolveNodeOutDataType(ASTNode node, ScopeStack scopeStack,
                                             ASTNode tree);
   static std::string resolveNodeOutDataTypeInternal(ASTNode node,
@@ -156,11 +197,19 @@ public:
                                                ASTNode tree);
   static std::string resolveRangeDataType(RangeNode *rangenode,
                                           ScopeStack scopeStack, ASTNode tree);
-  static std::string resolvePortPropertyDataType(PortPropertyNode *portproperty,
+  static std::string resolveMemberAccessDataType(MemberAccessNode *memberAccess,
                                                  ScopeStack scopeStack,
                                                  ASTNode tree);
+  static std::string resolvePortPropertyDataType(PortPropertyNode *portproperty,
+                                                 ScopeStack scopeStack,
+                                                 ASTNode tree) {
+    return resolveMemberAccessDataType(portproperty, scopeStack, tree);
+  }
 
-  static std::vector<ASTNode> getDomainIOBlockDeclarations(ASTNode tree);
+  static std::vector<ASTNode> getDomainIOEntityDeclarations(ASTNode tree);
+  static std::vector<ASTNode> getDomainIOBlockDeclarations(ASTNode tree) {
+    return getDomainIOEntityDeclarations(tree);
+  }
 
   static std::shared_ptr<DeclarationNode>
   matchDefinitionToTypes(std::vector<std::shared_ptr<DeclarationNode>> decls,
@@ -182,7 +231,11 @@ public:
                     std::shared_ptr<DeclarationNode> &outBlockDecl);
 
   static std::vector<ASTNode>
-  getUsedBlocksInStreams(std::shared_ptr<DeclarationNode> funcDecl);
+  getUsedEntitiesInStreams(std::shared_ptr<DeclarationNode> funcDecl);
+  static std::vector<ASTNode>
+  getUsedBlocksInStreams(std::shared_ptr<DeclarationNode> funcDecl) {
+    return getUsedEntitiesInStreams(funcDecl);
+  }
 
   using DataInfo = std::pair<ASTNode, std::string>; // Instance, Type
   struct TypeTree {

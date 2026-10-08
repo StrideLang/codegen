@@ -36,8 +36,9 @@
 #define CODERESOLVER_H
 
 #include "stride/parser/ast.h"
-#include "stride/parser/blocknode.h"
-#include "stride/parser/bundlenode.h"
+#include "stride/parser/entitynode.h"
+#include "stride/parser/arraynode.h"
+#include "stride/parser/memberaccessnode.h"
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/expressionnode.h"
 #include "stride/parser/propertynode.h"

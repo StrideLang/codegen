@@ -100,9 +100,14 @@ private:
                         std::shared_ptr<DeclarationNode> declaration,
                         ScopeStack scopeStack, ASTNode tree);
 
+  int getEntityDataSize(std::shared_ptr<DeclarationNode> declaration,
+                        ScopeStack scope,
+                        std::vector<LangError> *errors = nullptr);
   int getBlockDataSize(std::shared_ptr<DeclarationNode> declaration,
                        ScopeStack scope,
-                       std::vector<LangError> *errors = nullptr);
+                       std::vector<LangError> *errors = nullptr) {
+    return getEntityDataSize(declaration, scope, errors);
+  }
 
   std::shared_ptr<StrideSystem> m_system;
   ASTNode m_tree;
