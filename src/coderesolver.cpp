@@ -40,6 +40,7 @@
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <set>

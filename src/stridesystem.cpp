@@ -38,6 +38,7 @@
 #include "Windows.h"
 #endif
 
+#include <algorithm>
 #include <cassert>
 #include <filesystem>
 #include <memory.h>

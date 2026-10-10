@@ -3,6 +3,7 @@
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <iostream>
