@@ -3629,20 +3629,17 @@ void CodeResolver::markConnectionForNode(ASTNode node, ScopeStack scopeStack,
 void CodeResolver::storeDeclarationsForNode(ASTNode node, ScopeStack scopeStack,
                                             ASTNode tree) {
   if (node->getNodeType() == AST::Function) {
-    auto decl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
-                                                scopeStack, tree);
     auto cachedDecl = std::static_pointer_cast<DeclarationNode>(
         node->getCompilerProperty("declaration"));
-    if (cachedDecl) {
-      if (decl && cachedDecl != decl) {
-        std::cerr << "ERROR: Declaration mismatch for node '"
-                  << ASTQuery::getNodeName(node) << "'" << std::endl;
+    std::shared_ptr<DeclarationNode> decl = cachedDecl;
+    if (!decl) {
+      decl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
+                                             scopeStack, tree);
+      if (decl && decl->getObjectType() != "platformModule") {
+        node->setCompilerProperty("declaration", decl);
       }
-    } else if (decl && decl->getObjectType() != "platformModule") {
-      node->setCompilerProperty("declaration", decl);
     }
     std::vector<ASTNode> scopeBlocks;
-    auto name = std::static_pointer_cast<FunctionNode>(node)->getName();
     if (decl) {
       auto blocks = decl->getCompilerProperty("blocks");
       if (blocks) {
@@ -3652,23 +3649,18 @@ void CodeResolver::storeDeclarationsForNode(ASTNode node, ScopeStack scopeStack,
       }
     }
     scopeStack.push_back({node, scopeBlocks});
-  }
-
-  if (node->getNodeType() == AST::Entity ||
-      node->getNodeType() == AST::Block ||
-      node->getNodeType() == AST::Array ||
-      node->getNodeType() == AST::Bundle ||
-      node->getNodeType() == AST::Function) {
-    auto decl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
-                                                scopeStack, tree);
-    auto cachedDecl = node->getCompilerProperty("declaration");
-    if (cachedDecl) {
-      if (decl && cachedDecl != decl) {
-        std::cerr << "ERROR: Declaration mismatch for node '"
-                  << ASTQuery::getNodeName(node) << "'" << std::endl;
+  } else if (node->getNodeType() == AST::Entity ||
+             node->getNodeType() == AST::Block ||
+             node->getNodeType() == AST::Array ||
+             node->getNodeType() == AST::Bundle) {
+    auto cachedDecl = std::static_pointer_cast<DeclarationNode>(
+        node->getCompilerProperty("declaration"));
+    if (!cachedDecl) {
+      auto decl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
+                                                  scopeStack, tree);
+      if (decl && decl->getObjectType() != "platformModule") {
+        node->setCompilerProperty("declaration", decl);
       }
-    } else if (decl && decl->getObjectType() != "platformModule") {
-      node->setCompilerProperty("declaration", decl);
     }
   } else if (node->getNodeType() == AST::Expression ||
              node->getNodeType() == AST::List) {
@@ -3888,11 +3880,15 @@ void CodeResolver::appendParent(std::shared_ptr<DeclarationNode> decl,
                                 std::shared_ptr<DeclarationNode> parent) {
   auto parentList = decl->getCompilerProperty("parentDeclarations");
   if (!parentList) {
-    decl->setCompilerProperty("parentDeclarations",
-                              std::make_shared<ListNode>(__FILE__, __LINE__));
-    parentList = decl->getCompilerProperty("parentDeclarations");
+    parentList = std::make_shared<ListNode>(__FILE__, __LINE__);
+    decl->setCompilerProperty("parentDeclarations", parentList);
   }
   if (parent) {
+    for (const auto &existing : parentList->getChildren()) {
+      if (existing == parent) {
+        return; // Already recorded, avoid duplicate entries and redundant traversal
+      }
+    }
     parentList->addChild(parent);
   }
   if (decl->getObjectType() == "module" ||
@@ -3905,16 +3901,17 @@ void CodeResolver::appendParent(std::shared_ptr<DeclarationNode> decl,
         if (node->getNodeType() == AST::Declaration ||
             node->getNodeType() == AST::ArrayDeclaration ||
             node->getNodeType() == AST::BundleDeclaration) {
+          auto childDecl = std::static_pointer_cast<DeclarationNode>(node);
           for (const auto &grandParent : parentList->getChildren()) {
             if (grandParent->getNodeType() == AST::Declaration ||
                 grandParent->getNodeType() == AST::ArrayDeclaration ||
                 grandParent->getNodeType() == AST::BundleDeclaration) {
               appendParent(
-                  std::static_pointer_cast<DeclarationNode>(node),
+                  childDecl,
                   std::static_pointer_cast<DeclarationNode>(grandParent));
             }
           }
-          appendParent(std::static_pointer_cast<DeclarationNode>(node), decl);
+          appendParent(childDecl, decl);
         }
         assert(node->getNodeType() == AST::Declaration ||
                node->getNodeType() == AST::ArrayDeclaration ||

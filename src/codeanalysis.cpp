@@ -1400,7 +1400,11 @@ int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
              node->getNodeType() == AST::Block) {
     EntityNode *name = static_cast<EntityNode *>(node.get());
     std::shared_ptr<DeclarationNode> block =
-        ASTQuery::findDeclarationByName(name->getName(), scope, tree);
+        std::static_pointer_cast<DeclarationNode>(
+            node->getCompilerProperty("declaration"));
+    if (!block) {
+      block = ASTQuery::findDeclarationByName(name->getName(), scope, tree);
+    }
     if (block) {
       return getTypeNumOutputs(block, scope, tree, errors);
     } else {
@@ -1435,7 +1439,12 @@ int CodeAnalysis::getNodeNumInputs(ASTNode node, ScopeStack scope, ASTNode tree,
     std::shared_ptr<FunctionNode> func =
         std::static_pointer_cast<FunctionNode>(node);
     std::shared_ptr<DeclarationNode> platformFunc =
-        ASTQuery::findDeclarationByName(func->getName(), scope, tree);
+        std::static_pointer_cast<DeclarationNode>(
+            node->getCompilerProperty("declaration"));
+    if (!platformFunc) {
+      platformFunc =
+          ASTQuery::findDeclarationByName(func->getName(), scope, tree);
+    }
     int dataSize = CodeAnalysis::getFunctionDataSize(func, scope, tree, errors);
     if (platformFunc) {
       if (platformFunc->getObjectType() == "reaction") {
@@ -1463,7 +1472,11 @@ int CodeAnalysis::getNodeNumInputs(ASTNode node, ScopeStack scope, ASTNode tree,
              node->getNodeType() == AST::Block) {
     EntityNode *name = static_cast<EntityNode *>(node.get());
     std::shared_ptr<DeclarationNode> block =
-        ASTQuery::findDeclarationByName(name->getName(), scope, tree);
+        std::static_pointer_cast<DeclarationNode>(
+            node->getCompilerProperty("declaration"));
+    if (!block) {
+      block = ASTQuery::findDeclarationByName(name->getName(), scope, tree);
+    }
     if (block) {
       return getTypeNumInputs(block, scope, tree, errors);
     } else {
@@ -2170,7 +2183,11 @@ std::string CodeAnalysis::resolveEntityDataType(ASTNode node,
   }
   auto name = ASTQuery::getNodeName(node);
   std::shared_ptr<DeclarationNode> declaration =
-      ASTQuery::findDeclarationByName(name, scopeStack, tree);
+      std::static_pointer_cast<DeclarationNode>(
+          node->getCompilerProperty("declaration"));
+  if (!declaration) {
+    declaration = ASTQuery::findDeclarationByName(name, scopeStack, tree);
+  }
   if (declaration) {
     if (ASTQuery::isConstant(declaration, scopeStack, tree)) {
       std::vector<std::shared_ptr<PropertyNode>> properties =

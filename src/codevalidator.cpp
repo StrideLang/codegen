@@ -43,6 +43,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <unordered_map>
 
 using namespace strd;
 
@@ -138,12 +139,8 @@ void CodeValidator::validateBundleIndeces(ASTNode node,
       errors.push_back(error);
     }
   }
-  for (ASTNode child : node->getChildren()) {
-    std::vector<ASTNode> blocksInScope =
-        CodeAnalysis::getEntitiesInScope(child, scope, m_tree);
-    auto subScope = scope;
-    subScope.push_back({child, blocksInScope});
-    validateBundleIndeces(child, errors, subScope);
+  for (const ASTNode &child : node->getChildren()) {
+    validateBundleIndeces(child, errors, scope);
   }
 }
 
@@ -184,23 +181,28 @@ void CodeValidator::validateBundleSizes(ASTNode node,
 
 void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
                                              std::vector<LangError> &errors) {
-  auto singleScope = scope.back();
-  while (singleScope.second.size() > 0) {
-    auto node = singleScope.second.front();
-    singleScope.second.erase(singleScope.second.begin());
-    for (ASTNode sibling : singleScope.second) {
-      std::string nodeName, siblingName;
-      if (sibling->getNodeType() == AST::Declaration ||
-          sibling->getNodeType() == AST::ArrayDeclaration ||
-          sibling->getNodeType() == AST::BundleDeclaration) {
-        siblingName = static_cast<DeclarationNode *>(sibling.get())->getName();
+  const auto &scopeNodes = scope.back().second;
+  std::unordered_map<std::string, std::vector<ASTNode>> declsByName;
+
+  for (const auto &node : scopeNodes) {
+    if (node->getNodeType() == AST::Declaration ||
+        node->getNodeType() == AST::ArrayDeclaration ||
+        node->getNodeType() == AST::BundleDeclaration) {
+      std::string name = static_cast<DeclarationNode *>(node.get())->getName();
+      if (!name.empty()) {
+        declsByName[name].push_back(node);
       }
-      if (node->getNodeType() == AST::Declaration ||
-          node->getNodeType() == AST::ArrayDeclaration ||
-          node->getNodeType() == AST::BundleDeclaration) {
-        nodeName = static_cast<DeclarationNode *>(node.get())->getName();
-      }
-      if (nodeName.size() > 0 && nodeName == siblingName) {
+    }
+  }
+
+  for (const auto &[name, candidates] : declsByName) {
+    if (candidates.size() <= 1) {
+      continue;
+    }
+    for (size_t i = 0; i < candidates.size(); ++i) {
+      const auto &node = candidates[i];
+      for (size_t j = i + 1; j < candidates.size(); ++j) {
+        const auto &sibling = candidates[j];
         // Check if framework matches
         auto nodeFrameworkNode = node->getCompilerProperty("framework");
         auto siblingFrameworkNode = sibling->getCompilerProperty("framework");
@@ -224,11 +226,14 @@ void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
         auto siblingScopes = sibling->getNamespaceList();
         if (nodeScopes.size() == siblingScopes.size()) {
           bool duplicateSymbol = true;
-          for (size_t i = 0; i < nodeScopes.size(); i++) {
-            if (nodeScopes[i] != siblingScopes[i]) {
+          for (size_t k = 0; k < nodeScopes.size(); k++) {
+            if (nodeScopes[k] != siblingScopes[k]) {
               duplicateSymbol = false;
               break;
             }
+          }
+          if (!duplicateSymbol) {
+            continue;
           }
           // Check if _at matches
           auto nodeAt = node->getCompilerProperty("_at");
@@ -259,12 +264,12 @@ void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
               }
             }
           }
-          if (duplicateSymbol && atMatches) {
+          if (atMatches) {
             LangError error;
             error.type = LangError::DuplicateSymbol;
             error.lineNumber = sibling->getLine();
             error.filename = sibling->getFilename();
-            error.errorTokens.push_back(nodeName);
+            error.errorTokens.push_back(name);
             error.errorTokens.push_back(node->getFilename());
             error.errorTokens.push_back(std::to_string(node->getLine()));
             errors.push_back(error);
@@ -272,6 +277,10 @@ void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
         }
       }
     }
+  }
+
+  // Recurse into code generator declarations
+  for (const auto &node : scopeNodes) {
     if (node->getNodeType() == AST::Declaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
       if (ASTQuery::isCodeGenerator(decl, scope, m_tree)) {

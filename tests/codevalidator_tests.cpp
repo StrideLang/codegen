@@ -1,3 +1,4 @@
+#include <chrono>
 #include "gtest/gtest.h"
 
 #include "stride/codegen/coderesolver.hpp"
@@ -72,4 +73,27 @@ TEST(CodeValidator, InvalidBundleAccess) {
   //   }
   // }
   // EXPECT_TRUE(foundIndexError);
+}
+
+TEST(CodeValidator, BenchmarkValidation) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree =
+      AST::parseFile(TESTS_SOURCE_DIR "resolver/block_persistence.stride");
+  ASSERT_TRUE(tree != nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto start = std::chrono::steady_clock::now();
+  CodeValidator validator(tree);
+  auto end = std::chrono::steady_clock::now();
+
+  EXPECT_TRUE(validator.isValid());
+  auto elapsedMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout << "[BENCHMARK] CodeValidator runtime: " << elapsedMs << " ms"
+            << std::endl;
+  // Should validate basic tree in well under 1000ms
+  EXPECT_LT(elapsedMs, 1000);
 }
