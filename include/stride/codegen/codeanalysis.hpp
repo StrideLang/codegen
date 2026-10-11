@@ -1,6 +1,7 @@
 #ifndef CODEANALYSIS_HPP
 #define CODEANALYSIS_HPP
 
+#include <unordered_set>
 #include "stridesystem.hpp"
 
 namespace strd {
@@ -247,6 +248,7 @@ public:
     std::vector<DataInfo> external;
     std::vector<DataInfo> persistent; // store state that persistes across calls
     std::vector<DataInfo> internal;
+    mutable std::unordered_set<std::string> namesSet;
 
     bool contains(std::string name);
     CodeAnalysis::TypeTree *find(ASTNode node,

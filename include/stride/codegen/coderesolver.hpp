@@ -46,6 +46,8 @@
 #include "stride/parser/streamnode.h"
 #include "stride/parser/valuenode.h"
 
+#include <set>
+
 #include "stridesystem.hpp"
 
 #include "systemconfiguration.hpp"
@@ -65,11 +67,14 @@ public:
 private:
   // Main processing functions
   void processSystem();
+  void desugar();
+  void desugarSingleEntryStreams(ASTNode node, std::set<const void *> &visited);
   void enableTesting();
   void declareModuleInternalBlocks();
   void resolveStreamSymbols();
   void resolveDeclarationSymbols();
   void processDeclarations();
+  void expandIndexedStreams();
   void expandParallel();
   void resolveConstants();
   void resolvePortProperties();
