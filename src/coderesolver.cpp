@@ -417,9 +417,28 @@ void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
 
 void CodeResolver::markNodePersistence(ASTNode streamsList, ASTNode blocksList,
                                        ScopeStack &scope, ASTNode tree) {
-  assert(streamsList);
+  if (!streamsList)
+    return;
   std::set<std::string> blocksWritten;
   std::set<std::string> blocksRead;
+
+  std::function<void(const ASTNode &, std::vector<std::string> &)>
+      collectNodeNames = [&](const ASTNode &n,
+                             std::vector<std::string> &names) {
+        if (!n)
+          return;
+        if (n->getNodeType() == AST::List ||
+            n->getNodeType() == AST::Expression) {
+          for (const auto &element : n->getChildren()) {
+            collectNodeNames(element, names);
+          }
+        } else if (n->getNodeType() != AST::Function) {
+          std::string nm = ASTQuery::getNodeName(n);
+          if (!nm.empty()) {
+            names.push_back(nm);
+          }
+        }
+      };
 
   for (const ASTNode &stream : streamsList->getChildren()) {
     if (stream->getNodeType() == AST::Stream) {
@@ -455,20 +474,13 @@ void CodeResolver::markNodePersistence(ASTNode streamsList, ASTNode blocksList,
             std::cerr << "ERROR: Can't find declaration for: " << node->toText()
                       << std::endl;
           }
-        } else if (node->getNodeType() == AST::List ||
-                   node->getNodeType() == AST::Expression) {
-          for (const auto &element : node->getChildren()) {
-            // TODO only keep blocks, this catches everything
-            // TODO do it recursively
-            nodeNames.push_back(ASTQuery::getNodeName(element));
-          }
         } else {
-          nodeNames.push_back(ASTQuery::getNodeName(node));
+          collectNodeNames(node, nodeNames);
         }
 
         for (const auto &nodeName : nodeNames) {
           auto blockDeclInternal =
-              ASTQuery::findDeclarationByName(nodeName, scope, streamsList);
+              ASTQuery::findDeclarationByName(nodeName, scope, tree);
           if (blockDeclInternal) {
             if (streamIt.hasNext()) { // If there is a next node, this is
               // a read
@@ -1566,7 +1578,26 @@ void CodeResolver::analyzeParents() {
 
 void CodeResolver::analyzePersistence() {
   auto scope = ScopeStack();
-  CodeResolver::markNodePersistence(m_tree, nullptr, scope, m_tree);
+  for (const auto &child : m_tree->getChildren()) {
+    if (child && (child->getNodeType() == AST::Declaration ||
+                  child->getNodeType() == AST::ArrayDeclaration)) {
+      auto decl = std::static_pointer_cast<DeclarationNode>(child);
+      auto blocksList = decl->getPropertyValue("blocks");
+      auto streamsList = decl->getPropertyValue("streams");
+      if (streamsList) {
+        if (blocksList) {
+          scope.push_back({decl, blocksList->getChildren()});
+        } else {
+          scope.push_back({decl, {}});
+        }
+        markNodePersistence(streamsList, blocksList, scope, m_tree);
+        scope.pop_back();
+      }
+    } else if (child && child->getNodeType() == AST::Stream) {
+      markNodePersistence(m_tree, nullptr, scope, m_tree);
+      break;
+    }
+  }
 }
 
 void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,

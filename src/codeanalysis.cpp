@@ -2425,8 +2425,11 @@ CodeAnalysis::NodeRole CodeAnalysis::determineNodeRole(
       if (blockDecl) { // If in local scope it is an internal block
         outBlockDecl = blockDecl;
         auto persistentProp = blockDecl->getCompilerProperty("persistent");
+        auto explicitPersistentProp = blockDecl->getPropertyValue("persistent");
         auto resetProp = blockDecl->getPropertyValue("reset");
         if (persistentProp ||
+            (explicitPersistentProp &&
+             explicitPersistentProp->getNodeType() != AST::None) ||
             (resetProp && resetProp->getNodeType() != AST::None)) {
           return NodeRole::Persistent;
         } else {
