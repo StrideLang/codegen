@@ -418,13 +418,13 @@ std::vector<std::string> StrideSystem::getPlatformTypeNames() {
   for (auto libNamespace : libObjects) {
     for (auto node : libNamespace.second) {
       if (node->getNodeType() == AST::Declaration) {
-        std::shared_ptr<DeclarationNode> block =
+        std::shared_ptr<DeclarationNode> decl =
             std::static_pointer_cast<DeclarationNode>(node);
-        if (block->getEntityType() == "type" ||
-            block->getEntityType() == "platformModule" ||
-            block->getEntityType() == "platformBlock") {
+        if (decl->getEntityType() == "type" ||
+            decl->getEntityType() == "platformModule" ||
+            decl->getEntityType() == "platformBlock") {
           ValueNode *name = static_cast<ValueNode *>(
-              block->getPropertyValue("typeName").get());
+              decl->getPropertyValue("typeName").get());
           if (name && name->getNodeType() == AST::String) {
             typeNames.push_back(name->getStringValue());
           }
@@ -444,12 +444,12 @@ std::vector<std::string> StrideSystem::getFunctionNames() {
 
     for (ASTNode node : it->second) {
       if (node->getNodeType() == AST::Declaration) {
-        DeclarationNode *block = static_cast<DeclarationNode *>(node.get());
-        if (block->getEntityType() == "module") {
+        DeclarationNode *decl = static_cast<DeclarationNode *>(node.get());
+        if (decl->getEntityType() == "module") {
           if (it->first.size() > 0) {
-            funcNames.push_back(it->first + ":" + block->getName());
+            funcNames.push_back(it->first + ":" + decl->getName());
           } else {
-            funcNames.push_back(block->getName());
+            funcNames.push_back(decl->getName());
           }
         }
       }

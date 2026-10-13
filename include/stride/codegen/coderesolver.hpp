@@ -159,7 +159,7 @@ private:
   void propagateDomainsForNode(ASTNode node, ScopeStack scopeStack);
   void resolveDomainForStreamNode(ASTNode node, ScopeStack scope);
 
-  ASTNode resolveMemberAccess(std::shared_ptr<MemberAccessNode> portProperty,
+  ASTNode resolveMemberAccess(std::shared_ptr<MemberAccessNode> memberAccess,
                               ScopeStack scopeStack);
 
   void

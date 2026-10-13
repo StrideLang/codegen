@@ -125,16 +125,16 @@ void CodeValidator::validateArrayIndices(ASTNode node,
                                          std::vector<LangError> &errors,
                                          ScopeStack scope) {
   if (node->getNodeType() == AST::Array) {
-    ArrayNode *bundle = static_cast<ArrayNode *>(node.get());
-    auto index = bundle->index();
+    ArrayNode *arrayNode = static_cast<ArrayNode *>(node.get());
+    auto index = arrayNode->index();
     if (index->getNodeType() != AST::Int &&
         index->getNodeType() != AST::MemberAccess &&
         index->getNodeType() != AST::Range &&
         index->getNodeType() != AST::List) {
       LangError error;
       error.type = LangError::InvalidIndexType;
-      error.lineNumber = bundle->getLine();
-      error.errorTokens.push_back(bundle->getName());
+      error.lineNumber = arrayNode->getLine();
+      error.errorTokens.push_back(arrayNode->getName());
       errors.push_back(error);
     }
   }

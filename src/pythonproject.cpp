@@ -331,36 +331,36 @@ void PythonProject::astToJson(ASTNode node, QJsonObject &obj) {
     newObject["line"] = node->getLine();
     obj["block"] = newObject;
   } else if (node->getNodeType() == AST::ArrayDeclaration) {
-    DeclarationNode *block = static_cast<DeclarationNode *>(node.get());
+    DeclarationNode *decl = static_cast<DeclarationNode *>(node.get());
     QJsonObject newObject;
-    std::shared_ptr<ArrayNode> bundle = block->getArrayIndex();
-    newObject["name"] = QString::fromStdString(bundle->getName());
-    newObject["type"] = QString::fromStdString(block->getEntityType());
-    std::vector<std::string> nsList = block->getNamespaceList();
+    std::shared_ptr<ArrayNode> arrayNode = decl->getArrayIndex();
+    newObject["name"] = QString::fromStdString(arrayNode->getName());
+    newObject["type"] = QString::fromStdString(decl->getEntityType());
+    std::vector<std::string> nsList = decl->getNamespaceList();
     QString ns;
     for (std::string name : nsList) {
       ns += QString::fromStdString(name) + "::";
     }
     ns.chop(2);
     newObject["namespace"] = ns;
-    ListNode *indexList = bundle->index().get();
+    ListNode *indexList = arrayNode->index().get();
     Q_ASSERT(indexList->size() == 1);
-    AST *bundleIndex = indexList->getChildren().at(0).get();
-    if (bundleIndex->getNodeType() == AST::Int ||
-        bundleIndex->getNodeType() == AST::Real) {
+    AST *arrayIndex = indexList->getChildren().at(0).get();
+    if (arrayIndex->getNodeType() == AST::Int ||
+        arrayIndex->getNodeType() == AST::Real) {
       newObject["size"] = static_cast<long long>(
-          static_cast<ValueNode *>(bundleIndex)->getIntValue());
-    } else if (bundleIndex->getNodeType() == AST::Entity) {
+          static_cast<ValueNode *>(arrayIndex)->getIntValue());
+    } else if (arrayIndex->getNodeType() == AST::Entity) {
       // FIXME we need to set the value from the name (it must be a constant)
       //            newObject["size"] =
       //            QString::fromStdString(static_cast<NameNode
-      //            *>(bundleIndex)->getName());
+      //            *>(arrayIndex)->getName());
       newObject["size"] = 8;
     } else {
       qDebug() << "Type for index not implemented.";
       // TODO Implement support for more index types
     }
-    std::vector<std::shared_ptr<PropertyNode>> props = block->getProperties();
+    std::vector<std::shared_ptr<PropertyNode>> props = decl->getProperties();
     //        QJsonObject propertiesObj;
     QJsonObject propObject;
     for (auto prop : props) {
