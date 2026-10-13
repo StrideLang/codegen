@@ -236,7 +236,7 @@ TEST(CodeAnalysis, TypeTreeGetParentTreeForNode) {
 
   // Test 3: Get parent for a node that is not in the tree
   auto dummyNode =
-      std::make_shared<BlockNode>("DummyBlock", __FILE__, __LINE__);
+      std::make_shared<EntityNode>("DummyBlock", __FILE__, __LINE__);
   auto *parentOfDummy = typeTree.getParentTreeForNode(dummyNode);
   EXPECT_EQ(parentOfDummy, nullptr);
 
@@ -346,12 +346,12 @@ TEST(CodeAnalysis, TypeTreePortProperty) {
             "ModInternal");
   ASSERT_EQ(typeTree.nodes[0].external.size(), 1);
   ASSERT_EQ(typeTree.nodes[0].external[0].first->getNodeType(),
-            AST::PortProperty);
-  auto pp = std::static_pointer_cast<PortPropertyNode>(
+            AST::MemberAccess);
+  auto pp = std::static_pointer_cast<MemberAccessNode>(
       typeTree.nodes[0].external[0].first);
 
-  ASSERT_EQ(pp->getName(), "InputPort");
-  ASSERT_EQ(pp->getPortName(), "size");
+  ASSERT_EQ(pp->getEntity(), "InputPort");
+  ASSERT_EQ(pp->getPropertyName(), "size");
 }
 
 TEST(CodeAnalysis, EvaluateBundleNumOutputs) {
@@ -402,7 +402,7 @@ TEST(CodeAnalysis, EvaluateSizePortProperty) {
           functionNode->getNamespaceList(), framework);
 
       if (funcDecl) {
-        int size = CodeAnalysis::evaluateSizePortProperty(
+        int size = CodeAnalysis::evaluateSizeMemberAccess(
             "InputPort", ScopeStack(), funcDecl, functionNode, tree);
         EXPECT_GE(size, -2);
         checked = true;

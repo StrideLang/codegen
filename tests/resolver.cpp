@@ -82,9 +82,9 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
     // FIXME
-    // EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    // EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
     //           "_IntType");
   }
   {
@@ -121,8 +121,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
   // ModuleInInt >> PassThroughWithType() >> ModuleWithTypeOutResolved;
@@ -133,8 +133,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_RealType");
   }
   {
@@ -143,8 +143,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_RealType");
   }
   // Forward resolution
@@ -153,8 +153,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
   {
@@ -162,8 +162,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
   {
@@ -171,8 +171,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
   {
@@ -180,8 +180,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
   // Bundles
@@ -191,8 +191,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
   {
@@ -201,8 +201,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
   {
@@ -211,8 +211,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    ASSERT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    ASSERT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
   {
@@ -221,8 +221,8 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(decl);
     auto dataType = decl->getPropertyValue("type");
     EXPECT_TRUE(dataType);
-    EXPECT_EQ(dataType->getNodeType(), AST::Block);
-    EXPECT_EQ(std::static_pointer_cast<BlockNode>(dataType)->getName(),
+    EXPECT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(std::static_pointer_cast<EntityNode>(dataType)->getName(),
               "_IntType");
   }
 
@@ -277,7 +277,7 @@ TEST(Resolver, SynthesizeBundleDeclarationMember) {
   auto decl = ASTQuery::findDeclarationByName("TypeTest", ScopeStack(), tree);
   EXPECT_TRUE(decl);
   auto elementDecl =
-      ASTQuery::synthesizeBundleDeclarationElement(decl, 3, ScopeStack(), tree);
+      ASTQuery::synthesizeArrayDeclarationElement(decl, 3, ScopeStack(), tree);
   EXPECT_TRUE(elementDecl);
   EXPECT_EQ(elementDecl->getNodeType(), AST::Declaration);
   auto elementValue = elementDecl->getPropertyValue("values");
@@ -301,7 +301,7 @@ TEST(Resolver, SynthesizeBundleDeclarationMemberNested) {
       ASTQuery::findDeclarationByName("NestedTypeTest", ScopeStack(), tree);
   EXPECT_TRUE(decl);
   auto elementDecl =
-      ASTQuery::synthesizeBundleDeclarationElement(decl, 3, ScopeStack(), tree);
+      ASTQuery::synthesizeArrayDeclarationElement(decl, 3, ScopeStack(), tree);
   ASSERT_TRUE(elementDecl);
   EXPECT_EQ(elementDecl->getNodeType(), AST::Declaration);
   auto elementValue = elementDecl->getPropertyValue("values");

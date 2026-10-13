@@ -70,16 +70,16 @@ private:
   void desugar();
   void desugarSingleEntryStreams(ASTNode node, std::set<const void *> &visited);
   void enableTesting();
-  void declareModuleInternalBlocks();
+  void declareModuleInternalEntities();
   void resolveStreamSymbols();
   void resolveDeclarationSymbols();
   void processDeclarations();
   void expandIndexedStreams();
   void expandParallel();
   void resolveConstants();
-  void resolvePortProperties();
+  void resolveMemberAccesses();
   void processDomains();
-  void setPortBlockAttributes(const ScopeStack &scope, ASTNode tree);
+  void setPortEntityAttributes(const ScopeStack &scope, ASTNode tree);
   void resolveAttributes(
       const ScopeStack &scope,
       ASTNode tree); // Resolve CodeGenetaror port attributes: rate, type
@@ -128,12 +128,12 @@ private:
                          ASTNode resolvingInstance, ASTNode domainName,
                          ScopeStack scopeStack);
 
-  std::vector<ASTNode> declareUnknownName(std::shared_ptr<BlockNode> block,
+  std::vector<ASTNode> declareUnknownName(std::shared_ptr<EntityNode> block,
                                           int size, ScopeStack localScope,
                                           ASTNode tree);
-  std::vector<ASTNode> declareUnknownBundle(std::shared_ptr<BundleNode> name,
-                                            int size, ScopeStack localScope,
-                                            ASTNode tree);
+  std::vector<ASTNode> declareUnknownArray(std::shared_ptr<ArrayNode> name,
+                                           int size, ScopeStack localScope,
+                                           ASTNode tree);
   std::shared_ptr<DeclarationNode> createConstantDeclaration(std::string name,
                                                              ASTNode value);
   void declareIfMissing(std::string name, ASTNode blockList, ASTNode value);
@@ -145,8 +145,8 @@ private:
   std::vector<ASTNode>
   declareUnknownFunctionSymbols(std::shared_ptr<FunctionNode> func,
                                 ScopeStack scopeStack, ASTNode tree);
-  std::shared_ptr<ListNode> expandNameToList(BlockNode *name, int size);
-  void expandNamesToBundles(std::shared_ptr<StreamNode> stream, ASTNode tree);
+  std::shared_ptr<ListNode> expandNameToList(EntityNode *name, int size);
+  void expandNamesToArrays(std::shared_ptr<StreamNode> stream, ASTNode tree);
   std::vector<ASTNode>
   declareUnknownStreamSymbols(std::shared_ptr<StreamNode> stream,
                               ASTNode previousStreamMember,
@@ -154,25 +154,25 @@ private:
   std::vector<ASTNode>
   getModuleStreams(std::shared_ptr<DeclarationNode> module);
 
-  void declareInternalBlocksForNode(ASTNode node, ScopeStack scope);
+  void declareInternalEntitiesForNode(ASTNode node, ScopeStack scope);
 
   void propagateDomainsForNode(ASTNode node, ScopeStack scopeStack);
   void resolveDomainForStreamNode(ASTNode node, ScopeStack scope);
 
-  ASTNode resolvePortProperty(std::shared_ptr<PortPropertyNode> portProperty,
+  ASTNode resolveMemberAccess(std::shared_ptr<MemberAccessNode> portProperty,
                               ScopeStack scopeStack);
 
   void
-  setPortBlockAttributesForDeclaration(std::shared_ptr<DeclarationNode> decl,
-                                       ScopeStack stack, ASTNode tree);
+  setPortEntityAttributesForDeclaration(std::shared_ptr<DeclarationNode> decl,
+                                        ScopeStack stack, ASTNode tree);
 
   void setNodeRate(ASTNode node, double rate, ScopeStack scope, ASTNode tree);
   void setNodeType(ASTNode node, ASTNode type, ScopeStack scope, ASTNode tree);
 
-  void setInputBlockForFunction(std::shared_ptr<FunctionNode> func,
-                                ScopeStack scopeStack, ASTNode previous);
-  void setOutputBlockForFunction(std::shared_ptr<FunctionNode> func,
+  void setInputEntityForFunction(std::shared_ptr<FunctionNode> func,
                                  ScopeStack scopeStack, ASTNode previous);
+  void setOutputEntityForFunction(std::shared_ptr<FunctionNode> func,
+                                  ScopeStack scopeStack, ASTNode previous);
   void checkStreamConnections(std::shared_ptr<StreamNode> stream,
                               ScopeStack scopeStack,
                               ASTNode previous = nullptr);

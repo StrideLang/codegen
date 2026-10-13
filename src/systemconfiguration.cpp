@@ -18,7 +18,7 @@ void SystemConfiguration::readConfiguration(std::string filename) {
       if (configNode->getNodeType() == AST::Declaration) {
         std::shared_ptr<DeclarationNode> configDecl =
             std::static_pointer_cast<DeclarationNode>(configNode);
-        if (configDecl->getObjectType() == "config") {
+        if (configDecl->getEntityType() == "config") {
           std::string framework;
           auto frameworkNode = configDecl->getPropertyValue("framework");
           if (frameworkNode && frameworkNode->getNodeType() == AST::String) {
@@ -39,7 +39,7 @@ void SystemConfiguration::readConfiguration(std::string filename) {
               }
             }
           }
-        } else if (configDecl->getObjectType() == "override") {
+        } else if (configDecl->getEntityType() == "override") {
           for (auto configOptions : configDecl->getProperties()) {
             std::string optionName = configOptions->getName();
             // TODO more robust capitalization

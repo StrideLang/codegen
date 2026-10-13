@@ -28,7 +28,7 @@ std::vector<std::string> CodeAnalysis::getUsedDomains(ASTNode tree) {
         }
       }
     } else if (node->getNodeType() == AST::Declaration ||
-               node->getNodeType() == AST::BundleDeclaration) {
+               node->getNodeType() == AST::ArrayDeclaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
       auto domainName =
           CodeAnalysis::getNodeDomainName(decl, ScopeStack(), tree);
@@ -60,20 +60,20 @@ ASTNode CodeAnalysis::getInstance(ASTNode block, ScopeStack scopeStack,
   } else if (block->getNodeType() == AST::Function) {
     inst = block;
   } else if (block->getNodeType() == AST::Declaration ||
-             block->getNodeType() == AST::BundleDeclaration) {
-    if (std::static_pointer_cast<DeclarationNode>(block)->getObjectType() ==
+             block->getNodeType() == AST::ArrayDeclaration) {
+    if (std::static_pointer_cast<DeclarationNode>(block)->getEntityType() ==
             "signal" ||
-        std::static_pointer_cast<DeclarationNode>(block)->getObjectType() ==
+        std::static_pointer_cast<DeclarationNode>(block)->getEntityType() ==
             "switch" ||
-        std::static_pointer_cast<DeclarationNode>(block)->getObjectType() ==
+        std::static_pointer_cast<DeclarationNode>(block)->getEntityType() ==
             "trigger" ||
-        std::static_pointer_cast<DeclarationNode>(block)->getObjectType() ==
+        std::static_pointer_cast<DeclarationNode>(block)->getEntityType() ==
             "string" ||
         ASTQuery::isConstant(std::static_pointer_cast<DeclarationNode>(block),
                              scopeStack, tree)) {
       inst = block;
     } else if (std::static_pointer_cast<DeclarationNode>(block)
-                   ->getObjectType() == "reaction") {
+                   ->getEntityType() == "reaction") {
       inst = block;
     } else {
       std::cout << __FILE__ << ":" << __LINE__
@@ -93,7 +93,7 @@ ASTNode CodeAnalysis::getInstance(ASTNode block, ScopeStack scopeStack,
     }
     if (decl) {
       auto typeDecl = ASTQuery::findTypeDeclaration(decl, scopeStack, tree);
-      if (typeDecl && typeDecl->getObjectType() == "platformBlock") {
+      if (typeDecl && typeDecl->getEntityType() == "platformBlock") {
         inst = block;
       } else {
         inst = decl;
@@ -132,8 +132,8 @@ CodeAnalysis::findDomainDeclaration(std::string domainName,
     if (node->getNodeType() == AST::Declaration) {
       std::shared_ptr<DeclarationNode> decl =
           std::static_pointer_cast<DeclarationNode>(node);
-      if (decl->getObjectType() == "_domainDefinition" ||
-          decl->getObjectType() == "gameDefinition") {
+      if (decl->getEntityType() == "_domainDefinition" ||
+          decl->getEntityType() == "gameDefinition") {
         if (domainName == decl->getName()) {
           auto domainDeclFramework = decl->getCompilerProperty("framework");
           if (domainDeclFramework &&
@@ -179,16 +179,16 @@ ASTNode CodeAnalysis::getNodeDomain(ASTNode node, ScopeStack scopeStack,
     return nullptr;
   }
 
-  if (node->getNodeType() == AST::Entity || node->getNodeType() == AST::Block) {
+  if (node->getNodeType() == AST::Entity) {
     EntityNode *name = static_cast<EntityNode *>(node.get());
     std::shared_ptr<DeclarationNode> declaration;
     auto declProp = node->getCompilerProperty("declaration");
     if (declProp && (declProp->getNodeType() == AST::Declaration ||
-                     declProp->getNodeType() == AST::BundleDeclaration)) {
+                     declProp->getNodeType() == AST::ArrayDeclaration)) {
       declaration = std::static_pointer_cast<DeclarationNode>(declProp);
     } else {
-      declaration = ASTQuery::findDeclarationByName(name->getName(), scopeStack,
-                                                    tree, name->getNamespaceList());
+      declaration = ASTQuery::findDeclarationByName(
+          name->getName(), scopeStack, tree, name->getNamespaceList());
     }
 
     if (declaration) {
@@ -207,18 +207,17 @@ ASTNode CodeAnalysis::getNodeDomain(ASTNode node, ScopeStack scopeStack,
         }
       }
     }
-  } else if (node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
+  } else if (node->getNodeType() == AST::Array) {
     ArrayNode *name = static_cast<ArrayNode *>(node.get());
 
     std::shared_ptr<DeclarationNode> declaration;
     auto declProp = node->getCompilerProperty("declaration");
     if (declProp && (declProp->getNodeType() == AST::Declaration ||
-                     declProp->getNodeType() == AST::BundleDeclaration)) {
+                     declProp->getNodeType() == AST::ArrayDeclaration)) {
       declaration = std::static_pointer_cast<DeclarationNode>(declProp);
     } else {
-      declaration = ASTQuery::findDeclarationByName(name->getName(), scopeStack,
-                                                    tree, name->getNamespaceList());
+      declaration = ASTQuery::findDeclarationByName(
+          name->getName(), scopeStack, tree, name->getNamespaceList());
     }
     if (declaration && declaration->getDomain()) {
       domainNode = declaration->getDomain()->deepCopy();
@@ -228,32 +227,31 @@ ASTNode CodeAnalysis::getNodeDomain(ASTNode node, ScopeStack scopeStack,
     std::vector<std::string> domainList;
     std::string tempDomainName;
     for (const ASTNode &member : node->getChildren()) {
-      if (member->getNodeType() == AST::Entity ||
-          member->getNodeType() == AST::Block) {
+      if (member->getNodeType() == AST::Entity) {
         EntityNode *name = static_cast<EntityNode *>(member.get());
         std::shared_ptr<DeclarationNode> declaration;
         auto declProp = member->getCompilerProperty("declaration");
         if (declProp && (declProp->getNodeType() == AST::Declaration ||
-                         declProp->getNodeType() == AST::BundleDeclaration)) {
+                         declProp->getNodeType() == AST::ArrayDeclaration)) {
           declaration = std::static_pointer_cast<DeclarationNode>(declProp);
         } else {
-          declaration = ASTQuery::findDeclarationByName(name->getName(), scopeStack,
-                                                        tree, name->getNamespaceList());
+          declaration = ASTQuery::findDeclarationByName(
+              name->getName(), scopeStack, tree, name->getNamespaceList());
         }
         if (declaration) {
           tempDomainName =
               CodeAnalysis::getNodeDomainName(declaration, scopeStack, tree);
         }
-      } else if (member->getNodeType() == AST::Array ||
-                 member->getNodeType() == AST::Bundle) {
+      } else if (member->getNodeType() == AST::Array) {
         ArrayNode *name = static_cast<ArrayNode *>(member.get());
         std::shared_ptr<DeclarationNode> declaration;
         auto declProp = member->getCompilerProperty("declaration");
         if (declProp && (declProp->getNodeType() == AST::Declaration ||
-                         declProp->getNodeType() == AST::BundleDeclaration)) {
+                         declProp->getNodeType() == AST::ArrayDeclaration)) {
           declaration = std::static_pointer_cast<DeclarationNode>(declProp);
         } else {
-          declaration = ASTQuery::findDeclarationByName(name->getName(), scopeStack, tree);
+          declaration = ASTQuery::findDeclarationByName(name->getName(),
+                                                        scopeStack, tree);
         }
         if (declaration) {
           tempDomainName =
@@ -263,8 +261,7 @@ ASTNode CodeAnalysis::getNodeDomain(ASTNode node, ScopeStack scopeStack,
                  member->getNodeType() == AST::Real ||
                  member->getNodeType() == AST::String ||
                  member->getNodeType() == AST::Switch ||
-                 member->getNodeType() == AST::MemberAccess ||
-                 member->getNodeType() == AST::PortProperty) {
+                 member->getNodeType() == AST::MemberAccess) {
         continue; // Don't append empty domain to domainList, as a value
                   // should take any domain.
       } else {
@@ -279,8 +276,7 @@ ASTNode CodeAnalysis::getNodeDomain(ASTNode node, ScopeStack scopeStack,
     return CodeAnalysis::getNodeDomain(node->getChildren().at(0), scopeStack,
                                        tree);
   } else if (node->getNodeType() == AST::Declaration ||
-             node->getNodeType() == AST::ArrayDeclaration ||
-             node->getNodeType() == AST::BundleDeclaration) {
+             node->getNodeType() == AST::ArrayDeclaration) {
     auto decl = static_cast<DeclarationNode *>(node.get());
     if (decl->getEntityType() == "reaction") {
       decl->getCompilerProperty("triggerDomain");
@@ -322,8 +318,7 @@ ASTNode CodeAnalysis::getNodeDomain(ASTNode node, ScopeStack scopeStack,
               domainId, domainFramework, tree);
           if (domainDecl) {
             auto parentDomain = domainDecl->getPropertyValue("parentDomain");
-            if (parentDomain && (parentDomain->getNodeType() == AST::Entity ||
-                                 parentDomain->getNodeType() == AST::Block)) {
+            if (parentDomain && parentDomain->getNodeType() == AST::Entity) {
               auto domainInstanceCountNode =
                   parentDomain->getCompilerProperty("instances");
               if (!domainInstanceCountNode) {
@@ -369,8 +364,7 @@ ASTNode CodeAnalysis::getNodeDomain(ASTNode node, ScopeStack scopeStack,
              node->getNodeType() == AST::Switch ||
              node->getNodeType() == AST::String) {
     domainNode = std::static_pointer_cast<ValueNode>(node)->getDomain();
-  } else if (node->getNodeType() == AST::MemberAccess ||
-             node->getNodeType() == AST::PortProperty) {
+  } else if (node->getNodeType() == AST::MemberAccess) {
 
     domainNode = node->getCompilerProperty("domain");
   }
@@ -397,8 +391,7 @@ std::string CodeAnalysis::getDomainIdentifier(ASTNode domain,
   // domainName property. This guarantees uniqueness within a scope.
   // TODO we should add scope markers to this identifier to avoid clashes
   if (domain) {
-    if (domain->getNodeType() == AST::Entity ||
-        domain->getNodeType() == AST::Block) {
+    if (domain->getNodeType() == AST::Entity) {
       auto domainBlock = std::static_pointer_cast<EntityNode>(domain);
       std::string framework;
       if (domainBlock->getScopeLevels() > 0) {
@@ -432,8 +425,7 @@ std::string CodeAnalysis::getDomainIdentifier(ASTNode domain,
                         ->getIntValue();
         name += ":" + std::to_string(index);
       }
-    } else if (domain->getNodeType() == AST::Array ||
-               domain->getNodeType() == AST::Bundle) {
+    } else if (domain->getNodeType() == AST::Array) {
       auto domainBlock = std::static_pointer_cast<ArrayNode>(domain);
       auto domainDeclaration = ASTQuery::findDeclarationByName(
           domainBlock->getName(), scopeStack, tree);
@@ -451,8 +443,7 @@ std::string CodeAnalysis::getDomainIdentifier(ASTNode domain,
       name = std::static_pointer_cast<ValueNode>(domain)->getStringValue();
       std::cerr << "DEPRECATED: String domain no longer allowed." << std::endl;
       //      assert(0 == 1); // Should not be allowed
-    } else if (domain->getNodeType() == AST::MemberAccess ||
-               domain->getNodeType() == AST::PortProperty) {
+    } else if (domain->getNodeType() == AST::MemberAccess) {
       auto portProperty = std::static_pointer_cast<MemberAccessNode>(domain);
       name = portProperty->getEntity() + "_" + portProperty->getPropertyName();
     }
@@ -461,7 +452,7 @@ std::string CodeAnalysis::getDomainIdentifier(ASTNode domain,
 }
 
 double CodeAnalysis::getNodeRate(ASTNode node, ScopeStack scope, ASTNode tree) {
-  if (node->getNodeType() == AST::Entity || node->getNodeType() == AST::Block) {
+  if (node->getNodeType() == AST::Entity) {
     EntityNode *name = static_cast<EntityNode *>(node.get());
     std::shared_ptr<DeclarationNode> declaration =
         ASTQuery::findDeclarationByName(name->getName(), scope, tree,
@@ -479,8 +470,7 @@ double CodeAnalysis::getNodeRate(ASTNode node, ScopeStack scope, ASTNode tree) {
         }
       }
     }
-  } else if (node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
+  } else if (node->getNodeType() == AST::Array) {
     ArrayNode *bundle = static_cast<ArrayNode *>(node.get());
     std::shared_ptr<DeclarationNode> declaration =
         ASTQuery::findDeclarationByName(bundle->getName(), scope, tree,
@@ -516,8 +506,7 @@ double CodeAnalysis::getNodeRate(ASTNode node, ScopeStack scope, ASTNode tree) {
     }
     return rate;
   } else if (node->getNodeType() == AST::Declaration ||
-             node->getNodeType() == AST::ArrayDeclaration ||
-             node->getNodeType() == AST::BundleDeclaration) {
+             node->getNodeType() == AST::ArrayDeclaration) {
     auto decl = std::static_pointer_cast<DeclarationNode>(node);
     if (decl) {
       ASTNode rateNode = decl->getPropertyValue("rate");
@@ -547,8 +536,7 @@ double CodeAnalysis::resolveRateToFloat(ASTNode rateNode, ScopeStack scope,
   } else if (rateNode->getNodeType() == AST::Real) {
     rate = ASTFunctions::evaluateConstReal(rateNode, {}, tree, errors);
     return rate;
-  } else if (rateNode->getNodeType() == AST::Entity ||
-             rateNode->getNodeType() == AST::Block) {
+  } else if (rateNode->getNodeType() == AST::Entity) {
     EntityNode *block = static_cast<EntityNode *>(rateNode.get());
     std::shared_ptr<DeclarationNode> valueDeclaration =
         ASTQuery::findDeclarationByName(block->getName(), scope, tree,
@@ -570,16 +558,15 @@ double CodeAnalysis::resolveRateToFloat(ASTNode rateNode, ScopeStack scope,
     if (errors->size() == 0) {
       return rate;
     }
-  } else if (rateNode->getNodeType() == AST::MemberAccess ||
-             rateNode->getNodeType() == AST::PortProperty) {
+  } else if (rateNode->getNodeType() == AST::MemberAccess) {
   }
   return rate;
 }
 
 double CodeAnalysis::getDomainDefaultRate(
     std::shared_ptr<DeclarationNode> domainDecl) {
-  assert(domainDecl->getObjectType() == "_domainDefinition" ||
-         domainDecl->getObjectType() == "gameDefinition");
+  assert(domainDecl->getEntityType() == "_domainDefinition" ||
+         domainDecl->getEntityType() == "gameDefinition");
   auto ratePort = domainDecl->getPropertyValue("rate");
   if (ratePort && (ratePort->getNodeType() == AST::Real ||
                    ratePort->getNodeType() == AST::Int)) {
@@ -600,16 +587,15 @@ std::string CodeAnalysis::getFrameworkForDomain(std::string domainName,
   for (const ASTNode &node : tree->getChildren()) {
     if (node->getNodeType() == AST::Declaration) {
       DeclarationNode *decl = static_cast<DeclarationNode *>(node.get());
-      if (decl->getObjectType() == "_domainDefinition" ||
-          decl->getObjectType() == "gameDefinition") {
+      if (decl->getEntityType() == "_domainDefinition" ||
+          decl->getEntityType() == "gameDefinition") {
         std::string declDomainName = decl->getName();
         if (declDomainName == domainName) {
           ASTNode frameworkNameValue = decl->getPropertyValue("framework");
           if (frameworkNameValue->getNodeType() == AST::String) {
             return static_cast<ValueNode *>(frameworkNameValue.get())
                 ->getStringValue();
-          } else if (frameworkNameValue->getNodeType() == AST::Entity ||
-                     frameworkNameValue->getNodeType() == AST::Block) {
+          } else if (frameworkNameValue->getNodeType() == AST::Entity) {
             auto fwBlock =
                 std::static_pointer_cast<EntityNode>(frameworkNameValue);
 
@@ -625,7 +611,7 @@ std::string CodeAnalysis::getFrameworkForDomain(std::string domainName,
                                                 fwBlock->getNamespaceList(),
                                                 frameworkName);
             if (fwDeclaration &&
-                (fwDeclaration->getObjectType() == "_frameworkDescription")) {
+                (fwDeclaration->getEntityType() == "_frameworkDescription")) {
               ASTNode frameworkName =
                   fwDeclaration->getPropertyValue("frameworkName");
               if (frameworkName &&
@@ -658,7 +644,7 @@ int CodeAnalysis::numParallelStreams(StreamNode *stream, StrideSystem &platform,
   int leftSize = 0;
   int rightSize = 0;
 
-  if (left->getNodeType() == AST::Entity || left->getNodeType() == AST::Block) {
+  if (left->getNodeType() == AST::Entity) {
     leftSize = ASTQuery::getNodeSize(left, scope, tree);
   } else if (left->getNodeType() == AST::List) {
     leftSize = ASTQuery::getNodeSize(left, scope, tree);
@@ -666,7 +652,7 @@ int CodeAnalysis::numParallelStreams(StreamNode *stream, StrideSystem &platform,
     leftSize = CodeAnalysis::getNodeNumOutputs(left, scope, tree, errors);
   }
   if (right->getNodeType() == AST::Entity ||
-      right->getNodeType() == AST::Block || right->getNodeType() == AST::List) {
+      right->getNodeType() == AST::List) {
     rightSize = ASTQuery::getNodeSize(right, scope, tree);
   } else if (right->getNodeType() == AST::Function) {
     int functionNodeSize = ASTQuery::getNodeSize(right, scope, tree);
@@ -680,7 +666,6 @@ int CodeAnalysis::numParallelStreams(StreamNode *stream, StrideSystem &platform,
 
     ASTNode firstMember = rightStream->getLeft();
     if (firstMember->getNodeType() == AST::Entity ||
-        firstMember->getNodeType() == AST::Block ||
         firstMember->getNodeType() == AST::List) {
       rightSize = ASTQuery::getNodeSize(firstMember, scope, tree);
     } else {
@@ -739,9 +724,7 @@ resolveConnectionEntityInternal(ASTNode node, ScopeStack scopeStack,
   if (node->getNodeType() == AST::Declaration) { // Signal
     return std::static_pointer_cast<DeclarationNode>(node);
   } else if (node->getNodeType() == AST::Entity ||
-             node->getNodeType() == AST::Block ||
-             node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
+             node->getNodeType() == AST::Array) {
     return ASTQuery::findDeclarationByName(ASTQuery::getNodeName(node),
                                            scopeStack, tree);
   } else if (node->getNodeType() == AST::Function) {
@@ -749,9 +732,9 @@ resolveConnectionEntityInternal(ASTNode node, ScopeStack scopeStack,
         node->getCompilerProperty("declaration"));
     if (funcDecl) {
       auto ports = funcDecl->getPropertyValue("ports");
-      auto portDeclBlock =
-          downStream ? ASTQuery::getModuleMainOutputPortBlock(funcDecl)
-                     : ASTQuery::getModuleMainInputPortBlock(funcDecl);
+      auto portDeclBlock = downStream
+                               ? ASTQuery::getModuleMainOutputPort(funcDecl)
+                               : ASTQuery::getModuleMainInputPort(funcDecl);
       if (portDeclBlock) {
         auto portBlock = portDeclBlock->getPropertyValue("block");
         if (portBlock) {
@@ -766,8 +749,7 @@ resolveConnectionEntityInternal(ASTNode node, ScopeStack scopeStack,
             auto blockDomain =
                 CodeAnalysis::getNodeDomain(portBlockDecl, {}, nullptr);
             if (blockDomain &&
-                (blockDomain->getNodeType() == AST::MemberAccess ||
-                 blockDomain->getNodeType() == AST::PortProperty)) {
+                blockDomain->getNodeType() == AST::MemberAccess) {
               auto portName =
                   std::static_pointer_cast<MemberAccessNode>(blockDomain)
                       ->getEntity();
@@ -783,16 +765,14 @@ resolveConnectionEntityInternal(ASTNode node, ScopeStack scopeStack,
                       portName) { // Port match. Now get outer node
                     auto portType =
                         std::static_pointer_cast<DeclarationNode>(port)
-                            ->getObjectType();
+                            ->getEntityType();
                     // TODO connect all port types
                     if (portType == "mainOutputPort" && downStream) {
                       auto outerBlock =
                           node->getCompilerProperty("outputBlock");
                       if (outerBlock) {
                         if (outerBlock->getNodeType() == AST::Entity ||
-                            outerBlock->getNodeType() == AST::Block ||
-                            outerBlock->getNodeType() == AST::Array ||
-                            outerBlock->getNodeType() == AST::Bundle) {
+                            outerBlock->getNodeType() == AST::Array) {
                           auto decl = ASTQuery::findDeclarationByName(
                               ASTQuery::getNodeName(outerBlock), scopeStack,
                               tree);
@@ -809,9 +789,7 @@ resolveConnectionEntityInternal(ASTNode node, ScopeStack scopeStack,
                       auto outerBlock = node->getCompilerProperty("inputBlock");
                       if (outerBlock) {
                         if (outerBlock->getNodeType() == AST::Entity ||
-                            outerBlock->getNodeType() == AST::Block ||
-                            outerBlock->getNodeType() == AST::Array ||
-                            outerBlock->getNodeType() == AST::Bundle) {
+                            outerBlock->getNodeType() == AST::Array) {
                           auto decl = ASTQuery::findDeclarationByName(
                               ASTQuery::getNodeName(outerBlock), scopeStack,
                               tree);
@@ -869,7 +847,7 @@ ASTNode CodeAnalysis::getMatchedOuterInstance(
       if (portBlockDecl && portBlockDecl->getName() == blockDecl->getName()) {
         // If it's a main port, we can get the external entity from the
         // compiler properties of the FunctionNode
-        if (portDecl->getObjectType() == "mainOutputPort") {
+        if (portDecl->getEntityType() == "mainOutputPort") {
           ASTNode extOutputBlockInst;
           auto outputBlock = functionNode->getCompilerProperty("outputBlock");
           if (outputBlock) {
@@ -878,7 +856,7 @@ ASTNode CodeAnalysis::getMatchedOuterInstance(
           }
           matchedInst = extOutputBlockInst;
           break;
-        } else if (portDecl->getObjectType() == "mainInputPort") {
+        } else if (portDecl->getEntityType() == "mainInputPort") {
           ASTNode extInputBlockInst;
           auto inputBlock = functionNode->getCompilerProperty("inputBlock");
           if (inputBlock) {
@@ -897,9 +875,7 @@ ASTNode CodeAnalysis::getMatchedOuterInstance(
                 functionNode->getPropertyValue(propertyName->toString());
             if (outerBlock) {
               if (outerBlock->getNodeType() == AST::Entity ||
-                  outerBlock->getNodeType() == AST::Block ||
-                  outerBlock->getNodeType() == AST::Array ||
-                  outerBlock->getNodeType() == AST::Bundle) {
+                  outerBlock->getNodeType() == AST::Array) {
                 matchedInst = ASTQuery::findDeclarationByName(
                     ASTQuery::getNodeName(outerBlock), scopeStack, tree);
                 break;
@@ -928,8 +904,7 @@ std::vector<ASTNode> CodeAnalysis::getEntitiesInScope(ASTNode root,
                                                       ASTNode tree) {
   std::vector<ASTNode> blocks;
   if (root->getNodeType() == AST::Declaration ||
-      root->getNodeType() == AST::ArrayDeclaration ||
-      root->getNodeType() == AST::BundleDeclaration) {
+      root->getNodeType() == AST::ArrayDeclaration) {
     std::shared_ptr<DeclarationNode> decl =
         std::static_pointer_cast<DeclarationNode>(root);
 
@@ -946,8 +921,7 @@ std::vector<ASTNode> CodeAnalysis::getEntitiesInScope(ASTNode root,
       auto newBlocks = getEntitiesInScope(element, scopeStack, tree);
       blocks.insert(blocks.end(), newBlocks.begin(), newBlocks.end());
     }
-  } else if (root->getNodeType() == AST::Entity ||
-             root->getNodeType() == AST::Block) {
+  } else if (root->getNodeType() == AST::Entity) {
     std::shared_ptr<EntityNode> name =
         std::static_pointer_cast<EntityNode>(root);
     std::shared_ptr<DeclarationNode> declaration =
@@ -955,8 +929,7 @@ std::vector<ASTNode> CodeAnalysis::getEntitiesInScope(ASTNode root,
     if (declaration) {
       blocks = getEntitiesInScope(declaration, scopeStack, tree);
     }
-  } else if (root->getNodeType() == AST::Array ||
-             root->getNodeType() == AST::Bundle) {
+  } else if (root->getNodeType() == AST::Array) {
     std::shared_ptr<ArrayNode> name = std::static_pointer_cast<ArrayNode>(root);
     std::shared_ptr<DeclarationNode> declaration =
         ASTQuery::findDeclarationByName(name->getName(), scopeStack, tree);
@@ -997,10 +970,8 @@ int CodeAnalysis::evaluateSizeMemberAccess(
           }
           std::string portBlockName;
           if (portBlock && (portBlock->getNodeType() == AST::Entity ||
-                            portBlock->getNodeType() == AST::Block ||
-                            portBlock->getNodeType() == AST::Array ||
-                            portBlock->getNodeType() == AST::Bundle)) {
-            if (portDecl->getObjectType() == "mainInputPort") {
+                            portBlock->getNodeType() == AST::Array)) {
+            if (portDecl->getEntityType() == "mainInputPort") {
               portSize =
                   CodeAnalysis::getNodeNumInputs(portBlock, scopeStack, tree);
               if (portSize == -2) {
@@ -1013,7 +984,7 @@ int CodeAnalysis::evaluateSizeMemberAccess(
                 scopeStack.push_back(innerScope);
               }
 
-            } else if (portDecl->getObjectType() == "mainOutputPort") {
+            } else if (portDecl->getEntityType() == "mainOutputPort") {
               portSize =
                   CodeAnalysis::getNodeNumOutputs(portBlock, scopeStack, tree);
               if (portSize == CodeAnalysis::SIZE_MEMBER_ACCESS) {
@@ -1025,7 +996,7 @@ int CodeAnalysis::evaluateSizeMemberAccess(
                     func->getPropertyValue(portName), scopeStack, tree);
                 scopeStack.push_back(innerScope);
               }
-            } else if (portDecl->getObjectType() == "propertyInputPort") {
+            } else if (portDecl->getEntityType() == "propertyInputPort") {
               portSize =
                   CodeAnalysis::getNodeNumInputs(portBlock, scopeStack, tree);
               if (portSize == CodeAnalysis::SIZE_MEMBER_ACCESS) {
@@ -1038,7 +1009,7 @@ int CodeAnalysis::evaluateSizeMemberAccess(
                 scopeStack.push_back(innerScope);
               }
 
-            } else if (portDecl->getObjectType() == "propertyOutputPort") {
+            } else if (portDecl->getEntityType() == "propertyOutputPort") {
               portSize =
                   CodeAnalysis::getNodeNumOutputs(portBlock, scopeStack, tree);
 
@@ -1086,10 +1057,8 @@ double CodeAnalysis::evaluateRateMemberAccess(
         }
         std::string portBlockName;
         if (portBlock && (portBlock->getNodeType() == AST::Entity ||
-                          portBlock->getNodeType() == AST::Block ||
-                          portBlock->getNodeType() == AST::Array ||
-                          portBlock->getNodeType() == AST::Bundle)) {
-          if (portDecl->getObjectType() == "mainInputPort") {
+                          portBlock->getNodeType() == AST::Array)) {
+          if (portDecl->getEntityType() == "mainInputPort") {
             double rate =
                 CodeAnalysis::resolveRate(portBlock, scopeStack, tree, false);
             if (rate == -1) {
@@ -1115,8 +1084,7 @@ double CodeAnalysis::evaluateRateMemberAccess(
                     functionNode->getName(), scopeStackOuter, tree,
                     functionNode->getNamespaceList(), framework);
                 if (resolvedBlock->getNodeType() == AST::Declaration ||
-                    resolvedBlock->getNodeType() == AST::ArrayDeclaration ||
-                    resolvedBlock->getNodeType() == AST::BundleDeclaration) {
+                    resolvedBlock->getNodeType() == AST::ArrayDeclaration) {
                   resolvedBlock = getMatchedOuterInstance(
                       functionNode,
                       std::static_pointer_cast<DeclarationNode>(resolvedBlock),
@@ -1127,7 +1095,7 @@ double CodeAnalysis::evaluateRateMemberAccess(
             }
             return rate;
 
-          } else if (portDecl->getObjectType() == "mainOutputPort") {
+          } else if (portDecl->getEntityType() == "mainOutputPort") {
             double rate =
                 CodeAnalysis::resolveRate(portBlock, scopeStack, tree, false);
             if (rate == -1) {
@@ -1154,8 +1122,7 @@ double CodeAnalysis::evaluateRateMemberAccess(
                     functionNode->getName(), scopeStackOuter, tree,
                     functionNode->getNamespaceList(), framework);
                 if (resolvedBlock->getNodeType() == AST::Declaration ||
-                    resolvedBlock->getNodeType() == AST::ArrayDeclaration ||
-                    resolvedBlock->getNodeType() == AST::BundleDeclaration) {
+                    resolvedBlock->getNodeType() == AST::ArrayDeclaration) {
                   resolvedBlock = getMatchedOuterInstance(
                       functionNode,
                       std::static_pointer_cast<DeclarationNode>(resolvedBlock),
@@ -1166,8 +1133,8 @@ double CodeAnalysis::evaluateRateMemberAccess(
             }
             return rate;
 
-          } else if (portDecl->getObjectType() == "propertyInputPort" ||
-                     portDecl->getObjectType() == "propertyOutputPort") {
+          } else if (portDecl->getEntityType() == "propertyInputPort" ||
+                     portDecl->getEntityType() == "propertyOutputPort") {
             double rate =
                 CodeAnalysis::resolveRate(portBlock, scopeStack, tree, false);
             if (rate == -1) {
@@ -1193,8 +1160,7 @@ double CodeAnalysis::evaluateRateMemberAccess(
                     functionNode->getName(), scopeStackOuter, tree,
                     functionNode->getNamespaceList(), framework);
                 if (resolvedBlock->getNodeType() == AST::Declaration ||
-                    resolvedBlock->getNodeType() == AST::ArrayDeclaration ||
-                    resolvedBlock->getNodeType() == AST::BundleDeclaration) {
+                    resolvedBlock->getNodeType() == AST::ArrayDeclaration) {
                   resolvedBlock = getMatchedOuterInstance(
                       functionNode,
                       std::static_pointer_cast<DeclarationNode>(resolvedBlock),
@@ -1249,8 +1215,7 @@ CodeAnalysis::getUsedMemberAccesses(std::shared_ptr<DeclarationNode> funcDecl) {
 std::vector<std::shared_ptr<MemberAccessNode>>
 CodeAnalysis::getUsedMemberAccessesInNode(ASTNode node) {
   std::vector<std::shared_ptr<MemberAccessNode>> used;
-  if (node->getNodeType() == AST::MemberAccess ||
-      node->getNodeType() == AST::PortProperty) {
+  if (node->getNodeType() == AST::MemberAccess) {
     used.push_back(std::static_pointer_cast<MemberAccessNode>(node));
   } else if (node->getNodeType() == AST::List ||
              node->getNodeType() == AST::Expression) {
@@ -1258,8 +1223,7 @@ CodeAnalysis::getUsedMemberAccessesInNode(ASTNode node) {
       auto newUsed = getUsedMemberAccessesInNode(elem);
       used.insert(used.end(), newUsed.begin(), newUsed.end());
     }
-  } else if (node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
+  } else if (node->getNodeType() == AST::Array) {
     auto index = std::static_pointer_cast<ArrayNode>(node)->index();
     if (index) {
       for (const auto &indexNode : index->getChildren()) {
@@ -1276,11 +1240,9 @@ std::vector<ASTNode> CodeAnalysis::getUsedEntitiesInNode(ASTNode node) {
   if (!node)
     return used;
 
-  if (node->getNodeType() == AST::Entity || node->getNodeType() == AST::Block ||
-      node->getNodeType() == AST::Array || node->getNodeType() == AST::Bundle) {
+  if (node->getNodeType() == AST::Entity || node->getNodeType() == AST::Array) {
     used.push_back(node);
-    if (node->getNodeType() == AST::Array ||
-        node->getNodeType() == AST::Bundle) {
+    if (node->getNodeType() == AST::Array) {
       auto index = std::static_pointer_cast<ArrayNode>(node)->index();
       if (index) {
         for (const auto &indexNode : index->getChildren()) {
@@ -1357,9 +1319,6 @@ int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
       }
     }
     return size;
-  } else if (node->getNodeType() == AST::Bundle) {
-    return ASTQuery::getBundleSize(std::static_pointer_cast<BundleNode>(node),
-                                   scope, tree, errors);
   } else if (node->getNodeType() == AST::Int ||
              node->getNodeType() == AST::Real ||
              node->getNodeType() == AST::String ||
@@ -1375,15 +1334,6 @@ int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
       auto size = std::max(leftSize, rightSize);
       return size;
     }
-  } else if (node->getNodeType() == AST::Block) {
-    BlockNode *name = static_cast<BlockNode *>(node.get());
-    std::shared_ptr<DeclarationNode> block =
-        ASTQuery::findDeclarationByName(name->getName(), scope, tree);
-    if (block) {
-      return getTypeNumOutputs(block, scope, tree, errors);
-    } else {
-      return CodeAnalysis::SIZE_UNKNOWN;
-    }
   } else if (node->getNodeType() == AST::Function) {
     std::shared_ptr<FunctionNode> func =
         std::static_pointer_cast<FunctionNode>(node);
@@ -1395,34 +1345,10 @@ int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
     } else {
       return CodeAnalysis::SIZE_UNKNOWN;
     }
-  } else if (node->getNodeType() == AST::PortProperty) {
-    std::shared_ptr<PortPropertyNode> portProp =
-        std::static_pointer_cast<PortPropertyNode>(node);
-    if (portProp->getPortName() == "size" ||
-        portProp->getPortName() == "rate" ||
-        portProp->getPortName() == "domain") {
-      return CodeAnalysis::SIZE_PORT_PROPERTY;
-    } else if (node->getNodeType() == AST::MemberAccess ||
-               node->getNodeType() == AST::PortProperty) {
-      std::shared_ptr<MemberAccessNode> portProp =
-          std::static_pointer_cast<MemberAccessNode>(node);
-      if (portProp->getPropertyName() == "size" ||
-          portProp->getPropertyName() == "rate" ||
-          portProp->getPropertyName() == "domain") {
-        return CodeAnalysis::SIZE_MEMBER_ACCESS;
-      } else {
-        std::cerr
-            << "Unknown member access in getNodeNumOutputs() setting size to 1"
-            << std::endl;
-        return 1;
-      }
-    }
-  } else if (node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
-    return ASTQuery::getBundleSize(std::static_pointer_cast<ArrayNode>(node),
-                                   scope, tree, errors);
-  } else if (node->getNodeType() == AST::Entity ||
-             node->getNodeType() == AST::Block) {
+  } else if (node->getNodeType() == AST::Array) {
+    return ASTQuery::getArraySize(std::static_pointer_cast<ArrayNode>(node),
+                                  scope, tree, errors);
+  } else if (node->getNodeType() == AST::Entity) {
     EntityNode *name = static_cast<EntityNode *>(node.get());
     std::shared_ptr<DeclarationNode> block =
         std::static_pointer_cast<DeclarationNode>(
@@ -1435,8 +1361,7 @@ int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
     } else {
       return CodeAnalysis::SIZE_UNKNOWN;
     }
-  } else if (node->getNodeType() == AST::MemberAccess ||
-             node->getNodeType() == AST::PortProperty) {
+  } else if (node->getNodeType() == AST::MemberAccess) {
     std::shared_ptr<MemberAccessNode> portProp =
         std::static_pointer_cast<MemberAccessNode>(node);
     if (portProp->getPropertyName() == "size" ||
@@ -1450,9 +1375,8 @@ int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
       return 1;
     }
   } else if (node->getNodeType() == AST::Declaration ||
-             node->getNodeType() == AST::ArrayDeclaration ||
-             node->getNodeType() == AST::BundleDeclaration) {
-    return ASTQuery::getBlockDeclaredSize(
+             node->getNodeType() == AST::ArrayDeclaration) {
+    return ASTQuery::getEntityDeclaredSize(
         std::static_pointer_cast<DeclarationNode>(node), scope, tree, errors);
   }
   return CodeAnalysis::SIZE_UNKNOWN;
@@ -1472,10 +1396,10 @@ int CodeAnalysis::getNodeNumInputs(ASTNode node, ScopeStack scope, ASTNode tree,
     }
     int dataSize = CodeAnalysis::getFunctionDataSize(func, scope, tree, errors);
     if (platformFunc) {
-      if (platformFunc->getObjectType() == "reaction") {
+      if (platformFunc->getEntityType() == "reaction") {
         return 1; // Reactions always have one input as main port for trigger
       } else {
-        auto subScope = ASTQuery::getModuleBlocks(platformFunc);
+        auto subScope = ASTQuery::getModuleEntities(platformFunc);
         scope.push_back({func, subScope});
 
         int numInputs = getTypeNumInputs(platformFunc, scope, tree, errors);
@@ -1493,8 +1417,7 @@ int CodeAnalysis::getNodeNumInputs(ASTNode node, ScopeStack scope, ASTNode tree,
     ASTNode left = stream->getLeft();
     int leftSize = CodeAnalysis::getNodeNumInputs(left, scope, tree, errors);
     return leftSize;
-  } else if (node->getNodeType() == AST::Entity ||
-             node->getNodeType() == AST::Block) {
+  } else if (node->getNodeType() == AST::Entity) {
     EntityNode *name = static_cast<EntityNode *>(node.get());
     std::shared_ptr<DeclarationNode> block =
         std::static_pointer_cast<DeclarationNode>(
@@ -1507,25 +1430,22 @@ int CodeAnalysis::getNodeNumInputs(ASTNode node, ScopeStack scope, ASTNode tree,
     } else {
       return CodeAnalysis::SIZE_UNKNOWN;
     }
-  } else if (node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
-    return ASTQuery::getBundleSize(std::static_pointer_cast<ArrayNode>(node),
-                                   scope, tree, errors);
+  } else if (node->getNodeType() == AST::Array) {
+    return ASTQuery::getArraySize(std::static_pointer_cast<ArrayNode>(node),
+                                  scope, tree, errors);
   } else if (node->getNodeType() == AST::List) {
     int size = 0;
     for (const ASTNode &member : node->getChildren()) {
       size += CodeAnalysis::getNodeNumInputs(member, scope, tree, errors);
     }
     return size;
-  } else if (node->getNodeType() == AST::MemberAccess ||
-             node->getNodeType() == AST::PortProperty) {
+  } else if (node->getNodeType() == AST::MemberAccess) {
     auto pp = std::static_pointer_cast<MemberAccessNode>(node);
     if (pp->getEntity() == "") {
       // TODO If it's a local port, we should be able to determine size
     }
   } else if (node->getNodeType() == AST::Declaration ||
-             node->getNodeType() == AST::ArrayDeclaration ||
-             node->getNodeType() == AST::BundleDeclaration) {
+             node->getNodeType() == AST::ArrayDeclaration) {
     return getTypeNumInputs(std::static_pointer_cast<DeclarationNode>(node),
                             scope, tree, errors);
   } else {
@@ -1537,20 +1457,18 @@ int CodeAnalysis::getNodeNumInputs(ASTNode node, ScopeStack scope, ASTNode tree,
 int CodeAnalysis::getTypeNumOutputs(
     std::shared_ptr<DeclarationNode> blockDeclaration, const ScopeStack &scope,
     ASTNode tree, std::vector<LangError> *errors) {
-  if (blockDeclaration->getNodeType() == AST::ArrayDeclaration ||
-      blockDeclaration->getNodeType() == AST::BundleDeclaration) {
-    return ASTQuery::getBlockDeclaredSize(blockDeclaration, scope, tree,
-                                          errors);
+  if (blockDeclaration->getNodeType() == AST::ArrayDeclaration) {
+    return ASTQuery::getEntityDeclaredSize(blockDeclaration, scope, tree,
+                                           errors);
   } else if (blockDeclaration->getNodeType() == AST::Declaration) {
-    if (blockDeclaration->getObjectType() == "module") {
+    if (blockDeclaration->getEntityType() == "module") {
       std::shared_ptr<DeclarationNode> portBlock =
-          ASTQuery::getModuleMainOutputPortBlock(blockDeclaration);
+          ASTQuery::getModuleMainOutputPort(blockDeclaration);
 
       EntityNode *outputName = nullptr;
       if (portBlock) {
         if (portBlock->getPropertyValue("block")->getNodeType() ==
-                AST::Entity ||
-            portBlock->getPropertyValue("block")->getNodeType() == AST::Block) {
+            AST::Entity) {
           outputName = static_cast<EntityNode *>(
               portBlock->getPropertyValue("block").get());
         } else {
@@ -1561,16 +1479,13 @@ int CodeAnalysis::getTypeNumOutputs(
       if (!outputName || outputName->getNodeType() == AST::None) {
         return 0;
       }
-      auto subScope = ASTQuery::getModuleBlocks(
+      auto subScope = ASTQuery::getModuleEntities(
           std::static_pointer_cast<DeclarationNode>(blockDeclaration));
       if (subScope.size() > 0) {
-        assert(outputName->getNodeType() == AST::Entity ||
-               outputName->getNodeType() == AST::Block);
+        assert(outputName->getNodeType() == AST::Entity);
         std::string outputBlockName = outputName->getName();
         for (const ASTNode &internalDeclarationNode : subScope) {
           if (internalDeclarationNode->getNodeType() == AST::ArrayDeclaration ||
-              internalDeclarationNode->getNodeType() ==
-                  AST::BundleDeclaration ||
               internalDeclarationNode->getNodeType() == AST::Declaration) {
             std::string blockName =
                 static_cast<DeclarationNode *>(internalDeclarationNode.get())
@@ -1581,11 +1496,9 @@ int CodeAnalysis::getTypeNumOutputs(
                       internalDeclarationNode);
               if (intBlock->getName() == outputBlockName) {
                 if (internalDeclarationNode->getNodeType() ==
-                        AST::ArrayDeclaration ||
-                    internalDeclarationNode->getNodeType() ==
-                        AST::BundleDeclaration) {
-                  return ASTQuery::getBlockDeclaredSize(intBlock, scope, tree,
-                                                        errors);
+                    AST::ArrayDeclaration) {
+                  return ASTQuery::getEntityDeclaredSize(intBlock, scope, tree,
+                                                         errors);
                 } else if (internalDeclarationNode->getNodeType() ==
                            AST::Declaration) {
                   return 1;
@@ -1595,12 +1508,12 @@ int CodeAnalysis::getTypeNumOutputs(
           }
         }
       }
-    } else if (blockDeclaration->getObjectType() == "platformModule") {
+    } else if (blockDeclaration->getEntityType() == "platformModule") {
       auto outputList = blockDeclaration->getPropertyValue("outputs");
       if (outputList && outputList->getNodeType() == AST::List) {
         return outputList->getChildren().size();
       }
-    } else if (blockDeclaration->getObjectType() == "buffer") {
+    } else if (blockDeclaration->getEntityType() == "buffer") {
       auto sizeNode = blockDeclaration->getPropertyValue("size");
       if (sizeNode->getNodeType() == AST::Int) {
         return std::static_pointer_cast<ValueNode>(sizeNode)->getIntValue();
@@ -1614,25 +1527,22 @@ int CodeAnalysis::getTypeNumOutputs(
 int CodeAnalysis::getTypeNumInputs(
     std::shared_ptr<DeclarationNode> blockDeclaration, const ScopeStack &scope,
     ASTNode tree, std::vector<LangError> *errors) {
-  if (blockDeclaration->getNodeType() == AST::ArrayDeclaration ||
-      blockDeclaration->getNodeType() == AST::BundleDeclaration) {
-    return ASTQuery::getBlockDeclaredSize(blockDeclaration, scope, tree,
-                                          errors);
+  if (blockDeclaration->getNodeType() == AST::ArrayDeclaration) {
+    return ASTQuery::getEntityDeclaredSize(blockDeclaration, scope, tree,
+                                           errors);
   } else if (blockDeclaration->getNodeType() == AST::Declaration) {
-    if (blockDeclaration->getObjectType() == "module" ||
-        blockDeclaration->getObjectType() == "loop") {
-      auto subScope = ASTQuery::getModuleBlocks(
+    if (blockDeclaration->getEntityType() == "module" ||
+        blockDeclaration->getEntityType() == "loop") {
+      auto subScope = ASTQuery::getModuleEntities(
           std::static_pointer_cast<DeclarationNode>(blockDeclaration));
       if (subScope.size() > 0) {
         EntityNode *inputName = nullptr;
 
         std::shared_ptr<DeclarationNode> portBlock =
-            ASTQuery::getModuleMainInputPortBlock(blockDeclaration);
+            ASTQuery::getModuleMainInputPort(blockDeclaration);
         if (portBlock) {
           if (portBlock->getPropertyValue("block")->getNodeType() ==
-                  AST::Entity ||
-              portBlock->getPropertyValue("block")->getNodeType() ==
-                  AST::Block) {
+              AST::Entity) {
             inputName = static_cast<EntityNode *>(
                 portBlock->getPropertyValue("block").get());
           } else {
@@ -1643,30 +1553,25 @@ int CodeAnalysis::getTypeNumInputs(
         if (!inputName || inputName->getNodeType() == AST::None) {
           return 0;
         }
-        assert(inputName->getNodeType() == AST::Entity ||
-               inputName->getNodeType() == AST::Block);
+        assert(inputName->getNodeType() == AST::Entity);
         std::string inputBlockName = inputName->getName();
         for (const ASTNode &internalDeclarationNode : subScope) {
           if (!internalDeclarationNode) {
             return CodeAnalysis::SIZE_UNKNOWN;
           }
           if (internalDeclarationNode->getNodeType() == AST::Declaration ||
-              internalDeclarationNode->getNodeType() == AST::ArrayDeclaration ||
-              internalDeclarationNode->getNodeType() ==
-                  AST::BundleDeclaration) {
+              internalDeclarationNode->getNodeType() == AST::ArrayDeclaration) {
             std::string blockName =
                 static_cast<DeclarationNode *>(internalDeclarationNode.get())
                     ->getName();
             if (blockName == inputBlockName) {
               if (internalDeclarationNode->getNodeType() ==
-                      AST::ArrayDeclaration ||
-                  internalDeclarationNode->getNodeType() ==
-                      AST::BundleDeclaration) {
+                  AST::ArrayDeclaration) {
                 std::shared_ptr<DeclarationNode> intBlock =
                     std::static_pointer_cast<DeclarationNode>(
                         internalDeclarationNode);
-                return ASTQuery::getBlockDeclaredSize(intBlock, scope, tree,
-                                                      errors);
+                return ASTQuery::getEntityDeclaredSize(intBlock, scope, tree,
+                                                       errors);
               } else if (internalDeclarationNode->getNodeType() ==
                          AST::Declaration) {
                 return 1;
@@ -1675,7 +1580,7 @@ int CodeAnalysis::getTypeNumInputs(
           }
         }
       }
-    } else if (blockDeclaration->getObjectType() == "platformModule") {
+    } else if (blockDeclaration->getEntityType() == "platformModule") {
       auto outputList = blockDeclaration->getPropertyValue("inputs");
       if (outputList && outputList->getNodeType() == AST::List) {
         return outputList->getChildren().size();
@@ -1684,10 +1589,10 @@ int CodeAnalysis::getTypeNumInputs(
       int size = ASTQuery::getNodeSize(blockDeclaration, scope, tree);
       int internalSize = 1;
       auto typeDeclaration = ASTQuery::findTypeDeclarationByName(
-          blockDeclaration->getObjectType(), scope, tree);
+          blockDeclaration->getEntityType(), scope, tree);
       if (typeDeclaration &&
-          (typeDeclaration->getObjectType() == "platformModule" ||
-           typeDeclaration->getObjectType() == "platformBlock")) {
+          (typeDeclaration->getEntityType() == "platformModule" ||
+           typeDeclaration->getEntityType() == "platformBlock")) {
         auto inputs = typeDeclaration->getPropertyValue("inputs");
         if (inputs && inputs->getNodeType() == AST::List) {
           internalSize = inputs->getChildren().size();
@@ -1736,24 +1641,22 @@ int CodeAnalysis::getFunctionDataSize(std::shared_ptr<FunctionNode> func,
         auto blocks = decl->getPropertyValue("blocks");
         if (portBlockNode && blocks) {
           std::string portBlockName;
-          if (portBlockNode->getNodeType() == AST::Entity ||
-              portBlockNode->getNodeType() == AST::Block) {
+          if (portBlockNode->getNodeType() == AST::Entity) {
             portBlockName =
                 std::static_pointer_cast<EntityNode>(portBlockNode)->getName();
-          } else if (portBlockNode->getNodeType() == AST::Array ||
-                     portBlockNode->getNodeType() == AST::Bundle) {
+          } else if (portBlockNode->getNodeType() == AST::Array) {
             portBlockName =
                 std::static_pointer_cast<ArrayNode>(portBlockNode)->getName();
           }
           auto portBlockDecl = ASTQuery::findDeclarationByName(
               portBlockName, {{nullptr, blocks->getChildren()}}, nullptr);
-          if (declaredPort->getObjectType() == "mainInputPort" ||
-              declaredPort->getObjectType() == "propertyInputPort") {
+          if (declaredPort->getEntityType() == "mainInputPort" ||
+              declaredPort->getEntityType() == "propertyInputPort") {
             size = CodeAnalysis::getNodeNumInputs(
                 portBlockNode, {{nullptr, blocks->getChildren()}}, tree,
                 errors);
-          } else if (declaredPort->getObjectType() == "mainOutputPort" ||
-                     declaredPort->getObjectType() == "propertyOutputPort") {
+          } else if (declaredPort->getEntityType() == "mainOutputPort" ||
+                     declaredPort->getEntityType() == "propertyOutputPort") {
             size = CodeAnalysis::getNodeNumOutputs(
                 portBlockNode, {{nullptr, blocks->getChildren()}}, tree,
                 errors);
@@ -1803,8 +1706,8 @@ int CodeAnalysis::getFunctionNumInstances(std::shared_ptr<FunctionNode> func,
             if (std::static_pointer_cast<ValueNode>(nameNode)
                     ->getStringValue() == portName) {
               int propertyBlockSize = 0;
-              if (portDecl->getObjectType() == "mainInputPort" ||
-                  portDecl->getObjectType() == "propertyInputPort") {
+              if (portDecl->getEntityType() == "mainInputPort" ||
+                  portDecl->getEntityType() == "propertyInputPort") {
                 propertyBlockSize = CodeAnalysis::getNodeNumOutputs(
                     portBlock, scope, tree, errors);
               } else {
@@ -1815,8 +1718,8 @@ int CodeAnalysis::getFunctionNumInstances(std::shared_ptr<FunctionNode> func,
               if (internalPortBlock) {
                 int internalBlockSize;
 
-                if (portDecl->getObjectType() == "mainInputPort" ||
-                    portDecl->getObjectType() == "propertyInputPort") {
+                if (portDecl->getEntityType() == "mainInputPort" ||
+                    portDecl->getEntityType() == "propertyInputPort") {
                   internalBlockSize = CodeAnalysis::getNodeNumOutputs(
                       internalPortBlock, scope, tree, errors);
                 } else {
@@ -1858,7 +1761,7 @@ CodeAnalysis::findDataTypeDeclaration(std::string dataTypeName, ASTNode tree) {
   for (const auto &node : tree->getChildren()) {
     if (node->getNodeType() == AST::Declaration) {
       auto nodeDecl = std::static_pointer_cast<DeclarationNode>(node);
-      if (nodeDecl->getObjectType() == "platformDataType") {
+      if (nodeDecl->getEntityType() == "platformDataType") {
         auto typeProp = nodeDecl->getPropertyValue("type");
         if (typeProp && typeProp->getNodeType() == AST::String) {
           if (std::static_pointer_cast<ValueNode>(typeProp)->getStringValue() ==
@@ -1877,20 +1780,20 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
                                                      ASTNode tree) {
   // TODO identify signal and module from inheritance
   // TODO support array
-  if (node->getNodeType() == AST::Entity || node->getNodeType() == AST::Block) {
+  if (node->getNodeType() == AST::Entity) {
     auto block = std::static_pointer_cast<EntityNode>(node);
     auto decl = ASTQuery::findDeclarationByName(block->getName(), scope, tree);
     if (!decl && tree) {
       decl = ASTQuery::findDeclarationByName(block->getName(), {}, tree);
     }
     if (decl) {
-      if (decl->getObjectType() == "signal") {
+      if (decl->getEntityType() == "signal") {
         // For now only resolve types for signals, perhaps in the future resolve
         // from all declarations that inherit from "Typed"
         return {getDataTypeForSignalDeclaration(decl)};
       }
-      if (decl->getObjectType() == "switch" ||
-          decl->getObjectType() == "trigger") {
+      if (decl->getEntityType() == "switch" ||
+          decl->getEntityType() == "trigger") {
         return {std::make_shared<EntityNode>(
             getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       } else {
@@ -1903,21 +1806,20 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
                 << " Could not find node declaration for " << block->getName()
                 << std::endl;
     }
-  } else if (node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
+  } else if (node->getNodeType() == AST::Array) {
     auto bundle = std::static_pointer_cast<ArrayNode>(node);
     auto decl = ASTQuery::findDeclarationByName(bundle->getName(), scope, tree);
     if (!decl && tree) {
       decl = ASTQuery::findDeclarationByName(bundle->getName(), {}, tree);
     }
     if (decl) {
-      if (decl->getObjectType() == "signal") {
+      if (decl->getEntityType() == "signal") {
         // For now only resolve types for signals, perhaps in the future
         // resolve from all declarations that inherit from "Typed"
         return {getDataTypeForSignalDeclaration(decl)};
       }
-      if (decl->getObjectType() == "switch" ||
-          decl->getObjectType() == "trigger") {
+      if (decl->getEntityType() == "switch" ||
+          decl->getEntityType() == "trigger") {
         return {std::make_shared<EntityNode>(
             getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       }
@@ -1934,7 +1836,7 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
       return {};
     }
     // first check if input entity in module has a defined type
-    auto inputPortBlock = ASTQuery::getModuleMainInputPortBlock(funcDecl);
+    auto inputPortBlock = ASTQuery::getModuleMainInputPort(funcDecl);
     if (inputPortBlock) {
       auto inputBlockNode = inputPortBlock->getPropertyValue("block");
       if (inputBlockNode) {
@@ -1942,12 +1844,11 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
             ASTQuery::getNodeName(inputBlockNode), scope,
             funcDecl->getPropertyValue("blocks"));
         if (blockNodeDecl &&
-            blockNodeDecl->getObjectType() ==
+            blockNodeDecl->getEntityType() ==
                 "signal") { // TODO do this for all "typed" entities
           auto dataType = getDataTypeForSignalDeclaration(blockNodeDecl);
           if (dataType) {
-            if (dataType->getNodeType() == AST::MemberAccess ||
-                dataType->getNodeType() == AST::PortProperty) {
+            if (dataType->getNodeType() == AST::MemberAccess) {
               auto dataTypePortBlock =
                   std::static_pointer_cast<MemberAccessNode>(dataType);
               if (dataTypePortBlock->getEntity() == inputPortBlock->getName()) {
@@ -1966,7 +1867,7 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
                 // TODO resolve for function secondary ports
                 // https://github.com/StrideLang/codegen/issues/3
                 auto outputPortBlock =
-                    ASTQuery::getModuleMainOutputPortBlock(funcDecl);
+                    ASTQuery::getModuleMainOutputPort(funcDecl);
                 if (outputPortBlock) {
                   if (dataTypePortBlock->getEntity() ==
                       outputPortBlock->getName()) {
@@ -2005,18 +1906,18 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
                                                       ASTNode tree) {
   // TODO identify signal and module from inheritance
   // TODO support array
-  if (node->getNodeType() == AST::Entity || node->getNodeType() == AST::Block) {
+  if (node->getNodeType() == AST::Entity) {
     auto block = std::static_pointer_cast<EntityNode>(node);
     auto decl = ASTQuery::findDeclarationByName(block->getName(), scope, tree);
     if (!decl && tree) {
       decl = ASTQuery::findDeclarationByName(block->getName(), {}, tree);
     }
     if (decl) {
-      if (decl->getObjectType() == "signal") {
+      if (decl->getEntityType() == "signal") {
         auto type = getDataTypeForSignalDeclaration(decl);
         return {type};
-      } else if (decl->getObjectType() == "switch" ||
-                 decl->getObjectType() == "trigger") {
+      } else if (decl->getEntityType() == "switch" ||
+                 decl->getEntityType() == "trigger") {
         return {
             std::make_shared<EntityNode>("_SwitchType", __FILE__, __LINE__)};
       }
@@ -2025,19 +1926,18 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
                 << " Could not find node declaration for " << block->getName()
                 << std::endl;
     }
-  } else if (node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
+  } else if (node->getNodeType() == AST::Array) {
     auto bundle = std::static_pointer_cast<ArrayNode>(node);
     auto decl = ASTQuery::findDeclarationByName(bundle->getName(), scope, tree);
     if (!decl && tree) {
       decl = ASTQuery::findDeclarationByName(bundle->getName(), {}, tree);
     }
     if (decl) {
-      if (decl->getObjectType() == "signal") {
+      if (decl->getEntityType() == "signal") {
         auto type = getDataTypeForSignalDeclaration(decl);
         return {type};
-      } else if (decl->getObjectType() == "switch" ||
-                 decl->getObjectType() == "trigger") {
+      } else if (decl->getEntityType() == "switch" ||
+                 decl->getEntityType() == "trigger") {
         return {
             std::make_shared<EntityNode>("_SwitchType", __FILE__, __LINE__)};
       }
@@ -2055,18 +1955,17 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
     }
     // first check if output entity in module has a defined type
     // then check connected entities against port entity definitions
-    auto outputPortBlock = ASTQuery::getModuleMainOutputPortBlock(funcDecl);
+    auto outputPortBlock = ASTQuery::getModuleMainOutputPort(funcDecl);
     if (outputPortBlock) {
       auto outputBlockNode = outputPortBlock->getPropertyValue("block");
       if (outputBlockNode) {
         auto blockNodeDecl = ASTQuery::findDeclarationByName(
             ASTQuery::getNodeName(outputBlockNode), scope,
             funcDecl->getPropertyValue("blocks"));
-        if (blockNodeDecl && blockNodeDecl->getObjectType() == "signal") {
+        if (blockNodeDecl && blockNodeDecl->getEntityType() == "signal") {
           auto dataType = getDataTypeForSignalDeclaration(blockNodeDecl);
           if (dataType) {
-            if (dataType->getNodeType() == AST::MemberAccess ||
-                dataType->getNodeType() == AST::PortProperty) {
+            if (dataType->getNodeType() == AST::MemberAccess) {
               auto dataTypePortBlock =
                   std::static_pointer_cast<MemberAccessNode>(dataType);
               if (dataTypePortBlock->getEntity() ==
@@ -2086,7 +1985,7 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
                 // TODO resolve for function secondary ports
                 // https://github.com/StrideLang/codegen/issues/3
                 auto inputPortBlock =
-                    ASTQuery::getModuleMainInputPortBlock(funcDecl);
+                    ASTQuery::getModuleMainInputPort(funcDecl);
                 if (inputPortBlock) {
                   if (dataTypePortBlock->getEntity() ==
                       inputPortBlock->getName()) {
@@ -2136,14 +2035,12 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
 
 ASTNode CodeAnalysis::getDataTypeForSignalDeclaration(
     std::shared_ptr<DeclarationNode> decl) {
-  assert(decl->getObjectType() == "signal");
+  assert(decl->getEntityType() == "signal");
   auto typeNode = decl->getPropertyValue("type");
   if (typeNode) {
-    if (typeNode->getNodeType() == AST::Entity ||
-        typeNode->getNodeType() == AST::Block) {
+    if (typeNode->getNodeType() == AST::Entity) {
       return std::static_pointer_cast<EntityNode>(typeNode);
-    } else if (typeNode->getNodeType() == AST::MemberAccess ||
-               typeNode->getNodeType() == AST::PortProperty) {
+    } else if (typeNode->getNodeType() == AST::MemberAccess) {
       return typeNode;
     } else if (typeNode->getNodeType() == AST::List) {
       // option for arrays
@@ -2162,17 +2059,15 @@ ASTNode CodeAnalysis::getDataTypeForSignalDeclaration(
 std::string
 CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
                                         const ScopeStack &scope, ASTNode tree) {
-  if (decl->getObjectType() == "signal") {
+  if (decl->getEntityType() == "signal") {
     auto typeNode = getDataTypeForSignalDeclaration(decl);
     if (typeNode) {
-      if (typeNode->getNodeType() == AST::Entity ||
-          typeNode->getNodeType() == AST::Block) {
+      if (typeNode->getNodeType() == AST::Entity) {
         return std::static_pointer_cast<EntityNode>(typeNode)->getName();
       } else if (typeNode->getNodeType() == AST::None) {
         // FIXME we should resolve the types in CodeResolver.
         return "_RealType";
-      } else if (typeNode->getNodeType() == AST::MemberAccess ||
-                 typeNode->getNodeType() == AST::PortProperty) {
+      } else if (typeNode->getNodeType() == AST::MemberAccess) {
         // It's a MemberAccess, we can't fully resolve it as string, default to
         // _RealType for now
         return "_RealType";
@@ -2186,9 +2081,9 @@ CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
     if (property) {
       return resolveNodeOutDataType(property->getValue(), scope, tree);
     }
-  } else if (decl->getObjectType() == "string") {
+  } else if (decl->getEntityType() == "string") {
     return "_StringType";
-  } else if (decl->getObjectType() == "switch") {
+  } else if (decl->getEntityType() == "switch") {
     return "_SwitchType";
   } else {
     //    qDebug() << __FILE__ << ":" << __LINE__ << " ERROR unsupported
@@ -2200,8 +2095,7 @@ CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
 std::string CodeAnalysis::resolveEntityDataType(ASTNode node,
                                                 ScopeStack scopeStack,
                                                 ASTNode tree) {
-  if (node->getNodeType() != AST::Entity && node->getNodeType() != AST::Block &&
-      node->getNodeType() != AST::Array && node->getNodeType() != AST::Bundle) {
+  if (node->getNodeType() != AST::Entity && node->getNodeType() != AST::Array) {
     std::cerr << __FILE__ << ":" << __LINE__
               << " Error, expecting entity or array" << std::endl;
     return std::string();
@@ -2222,17 +2116,16 @@ std::string CodeAnalysis::resolveEntityDataType(ASTNode node,
       if (property) {
         return resolveNodeOutDataType(property->getValue(), scopeStack, tree);
       }
-    } else if (declaration->getObjectType() == "signal") {
+    } else if (declaration->getEntityType() == "signal") {
       std::vector<std::shared_ptr<PropertyNode>> properties =
           declaration->getProperties();
       ASTNode typeNode = declaration->getPropertyValue("type");
-      if (typeNode && (typeNode->getNodeType() == AST::Entity ||
-                       typeNode->getNodeType() == AST::Block)) {
+      if (typeNode && typeNode->getNodeType() == AST::Entity) {
         return std::static_pointer_cast<EntityNode>(typeNode)->getName();
       }
       return "";
-    } else if (declaration->getObjectType() == "switch" ||
-               declaration->getObjectType() == "trigger") {
+    } else if (declaration->getEntityType() == "switch" ||
+               declaration->getEntityType() == "trigger") {
       return "_SwitchType";
     } else {
       return "";
@@ -2242,21 +2135,21 @@ std::string CodeAnalysis::resolveEntityDataType(ASTNode node,
 }
 
 std::string CodeAnalysis::resolveNodeOutDataType(ASTNode node,
-                                                 ScopeStack scopeStack,
+                                                 const ScopeStack &scopeStack,
                                                  ASTNode tree) {
   if (!node)
     return "";
 
   std::string cacheKey;
   if (scopeStack.empty()) {
-    cacheKey = "resolvedOutDataType_";
+    cacheKey = "_cacheResolvedOutDataType";
   } else {
     std::string scopeKey;
     for (const auto &s : scopeStack) {
       if (s.first)
         scopeKey += ASTQuery::getNodeName(s.first) + "_";
     }
-    cacheKey = "resolvedOutDataType_" + scopeKey;
+    cacheKey = "_cacheResolvedOutDataType_" + scopeKey;
   }
 
   auto typeProp = node->getCompilerProperty(cacheKey);
@@ -2274,9 +2167,8 @@ std::string CodeAnalysis::resolveNodeOutDataType(ASTNode node,
   return result;
 }
 
-std::string CodeAnalysis::resolveNodeOutDataTypeInternal(ASTNode node,
-                                                         ScopeStack scopeStack,
-                                                         ASTNode tree) {
+std::string CodeAnalysis::resolveNodeOutDataTypeInternal(
+    ASTNode node, const ScopeStack &scopeStack, ASTNode tree) {
   if (node->getNodeType() == AST::Int) {
     return "_IntType";
   } else if (node->getNodeType() == AST::Real) {
@@ -2289,9 +2181,7 @@ std::string CodeAnalysis::resolveNodeOutDataTypeInternal(ASTNode node,
     return resolveListDataType(static_cast<ListNode *>(node.get()), scopeStack,
                                tree);
   } else if (node->getNodeType() == AST::Entity ||
-             node->getNodeType() == AST::Block ||
-             node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
+             node->getNodeType() == AST::Array) {
     return resolveEntityDataType(node, scopeStack, tree);
   } else if (node->getNodeType() == AST::Expression) {
     return resolveExpressionDataType(static_cast<ExpressionNode *>(node.get()),
@@ -2299,8 +2189,7 @@ std::string CodeAnalysis::resolveNodeOutDataTypeInternal(ASTNode node,
   } else if (node->getNodeType() == AST::Range) {
     return resolveRangeDataType(static_cast<RangeNode *>(node.get()),
                                 scopeStack, tree);
-  } else if (node->getNodeType() == AST::MemberAccess ||
-             node->getNodeType() == AST::PortProperty) {
+  } else if (node->getNodeType() == AST::MemberAccess) {
     return resolveMemberAccessDataType(
         static_cast<MemberAccessNode *>(node.get()), scopeStack, tree);
   }
@@ -2364,7 +2253,7 @@ std::string CodeAnalysis::resolveExpressionDataType(ExpressionNode *exprnode,
 }
 
 std::string CodeAnalysis::resolveRangeDataType(RangeNode *rangenode,
-                                               ScopeStack scopeStack,
+                                               const ScopeStack &scopeStack,
                                                ASTNode tree) {
   auto leftType =
       resolveNodeOutDataType(rangenode->startIndex(), scopeStack, tree);
@@ -2396,18 +2285,17 @@ std::vector<ASTNode> CodeAnalysis::getDomainIOEntityDeclarations(ASTNode tree) {
   for (const auto &node : tree->getChildren()) {
     if (node->getNodeType() == AST::Declaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
-      if (decl->getObjectType() == "_domainDefinition" ||
-          decl->getObjectType() == "gameDefinition") {
+      if (decl->getEntityType() == "_domainDefinition" ||
+          decl->getEntityType() == "gameDefinition") {
         auto inputsNode = decl->getPropertyValue("inputs");
         if (inputsNode) {
           for (const auto &inputNode : inputsNode->getChildren()) {
             if (inputNode->getNodeType() == AST::Declaration ||
-                inputNode->getNodeType() == AST::ArrayDeclaration ||
-                inputNode->getNodeType() == AST::BundleDeclaration) {
+                inputNode->getNodeType() == AST::ArrayDeclaration) {
               auto inputDecl =
                   std::static_pointer_cast<DeclarationNode>(inputNode);
-              if (inputDecl->getObjectType() == "signal" ||
-                  inputDecl->getObjectType() == "switch") {
+              if (inputDecl->getEntityType() == "signal" ||
+                  inputDecl->getEntityType() == "switch") {
                 decls.push_back(inputNode);
               } else {
                 std::cerr << "ERROR unexpected declaration for domain input "
@@ -2421,12 +2309,11 @@ std::vector<ASTNode> CodeAnalysis::getDomainIOEntityDeclarations(ASTNode tree) {
         if (outputsNode) {
           for (const auto &outputNode : outputsNode->getChildren()) {
             if (outputNode->getNodeType() == AST::Declaration ||
-                outputNode->getNodeType() == AST::ArrayDeclaration ||
-                outputNode->getNodeType() == AST::BundleDeclaration) {
+                outputNode->getNodeType() == AST::ArrayDeclaration) {
               auto inputDecl =
                   std::static_pointer_cast<DeclarationNode>(outputNode);
-              if (inputDecl->getObjectType() == "signal" ||
-                  inputDecl->getObjectType() == "switch") {
+              if (inputDecl->getEntityType() == "signal" ||
+                  inputDecl->getEntityType() == "switch") {
                 decls.push_back(outputNode);
               } else {
                 std::cerr << "ERROR unexpected declaration for domain output "
@@ -2448,7 +2335,7 @@ std::shared_ptr<DeclarationNode> CodeAnalysis::matchDefinitionToTypes(
   std::shared_ptr<DeclarationNode> funcDecl;
   // First pass: check platformModule declarations
   for (const auto &decl : decls) {
-    if (decl->getObjectType() == "platformModule") {
+    if (decl->getEntityType() == "platformModule") {
       auto inputs = decl->getPropertyValue("inputs");
       bool matches = true;
       if (inputs) {
@@ -2576,7 +2463,7 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
                                                     scope, tree);
     auto funcDeclType = ASTQuery::findTypeDeclaration(funcDecl, scope, tree);
     if (funcDecl && funcDeclType) {
-      if (funcDecl->getObjectType() != "platformModule") {
+      if (funcDecl->getEntityType() != "platformModule") {
         auto blocks = funcDecl->getPropertyValue("blocks");
         auto streams = funcDecl->getPropertyValue("streams");
 
@@ -2608,20 +2495,20 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
                   ASTQuery::getNodeName(typeTree.instance), scope, tree);
               if (parentDecl) {
                 if (external.first->getNodeType() == AST::Declaration) {
-                  if (ASTQuery::isInputPortBlock(
+                  if (ASTQuery::isInputPort(
                           std::static_pointer_cast<DeclarationNode>(
                               external.first),
                           parentDecl, scope, tree)) {
                     typeTree.input.push_back(external);
 
-                  } else if (ASTQuery::isOutputPortBlock(
+                  } else if (ASTQuery::isOutputPort(
                                  std::static_pointer_cast<DeclarationNode>(
                                      external.first),
                                  parentDecl, scope, tree)) {
                     typeTree.output.push_back(external);
 
                   } else {
-                    auto blocks = ASTQuery::getModuleBlocks(
+                    auto blocks = ASTQuery::getModuleEntities(
                         std::static_pointer_cast<DeclarationNode>(parentDecl));
                     for (const auto &block : blocks) {
                       if (ASTQuery::getNodeName(block) ==
@@ -2648,9 +2535,7 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
                 << " ERROR: domain not found: " << std::endl;
     }
   } else if (streamNode->getNodeType() == AST::Entity ||
-             streamNode->getNodeType() == AST::Block ||
-             streamNode->getNodeType() == AST::Array ||
-             streamNode->getNodeType() == AST::Bundle) {
+             streamNode->getNodeType() == AST::Array) {
     auto block = streamNode;
     // Check if declared in tree root
     auto blockName = ASTQuery::getNodeName(block);
@@ -2744,8 +2629,7 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
                   << std::endl;
       }
     }
-    if (streamNode->getNodeType() == AST::Array ||
-        streamNode->getNodeType() == AST::Bundle) {
+    if (streamNode->getNodeType() == AST::Array) {
       auto indeces = std::static_pointer_cast<ArrayNode>(streamNode)->index();
       if (indeces) {
         for (const auto &index : indeces->getChildren()) {
@@ -2761,8 +2645,7 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
     auto exprNode = std::static_pointer_cast<ExpressionNode>(streamNode);
     processStreamNode(exprNode->getLeft(), scope, tree, typeTree);
     processStreamNode(exprNode->getRight(), scope, tree, typeTree);
-  } else if (streamNode->getNodeType() == AST::MemberAccess ||
-             streamNode->getNodeType() == AST::PortProperty) {
+  } else if (streamNode->getNodeType() == AST::MemberAccess) {
     if (scope.size() == 0) {
       std::cerr << __FILE__ << ":" << __LINE__
                 << " Error: member access in root scope: "
@@ -2781,11 +2664,10 @@ CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
   std::vector<ASTNode> domainInstances;
   for (const auto &node : tree->getChildren()) {
     if (node->getNodeType() == AST::Declaration ||
-        node->getNodeType() == AST::ArrayDeclaration ||
-        node->getNodeType() == AST::BundleDeclaration) {
+        node->getNodeType() == AST::ArrayDeclaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
-      if (decl->getObjectType() == "_domainDefinition" ||
-          decl->getObjectType() == "gameDefinition") {
+      if (decl->getEntityType() == "_domainDefinition" ||
+          decl->getEntityType() == "gameDefinition") {
         typeTree.nodes.emplace_back(TypeTree());
         auto &domainTree = typeTree.nodes.back();
         domainTree.instance = decl;
@@ -2793,8 +2675,7 @@ CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
         if (outputsList) {
           for (const auto &domainNode : outputsList->getChildren()) {
             if (domainNode->getNodeType() == AST::Declaration ||
-                domainNode->getNodeType() == AST::ArrayDeclaration ||
-                domainNode->getNodeType() == AST::BundleDeclaration) {
+                domainNode->getNodeType() == AST::ArrayDeclaration) {
               auto blockDecl =
                   std::static_pointer_cast<DeclarationNode>(domainNode);
               auto type = getDataTypeForDeclaration(blockDecl, {}, tree);
@@ -2808,8 +2689,7 @@ CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
         if (inputsList) {
           for (const auto &domainNode : inputsList->getChildren()) {
             if (domainNode->getNodeType() == AST::Declaration ||
-                domainNode->getNodeType() == AST::ArrayDeclaration ||
-                domainNode->getNodeType() == AST::BundleDeclaration) {
+                domainNode->getNodeType() == AST::ArrayDeclaration) {
               auto blockDecl =
                   std::static_pointer_cast<DeclarationNode>(domainNode);
               auto type = getDataTypeForDeclaration(blockDecl, {}, tree);
@@ -2830,8 +2710,7 @@ CodeAnalysis::getStateStructInformation(const ScopeStack &scope, ASTNode tree) {
         processStreamNode(it.next(), scope, tree, typeTree);
       }
     } else if (node->getNodeType() == AST::Declaration ||
-               node->getNodeType() == AST::ArrayDeclaration ||
-               node->getNodeType() == AST::BundleDeclaration) {
+               node->getNodeType() == AST::ArrayDeclaration) {
     }
   }
   return typeTree;
@@ -2855,16 +2734,14 @@ void CodeAnalysis::processStreamNodeForDeclaration(
     }
     CodeAnalysis::TypeTree nestedTree;
     nestedTree.instance = nestedFunc; // Set instance to the call site
-    if (nestedFuncDecl && nestedFuncDecl->getObjectType() != "platformModule") {
+    if (nestedFuncDecl && nestedFuncDecl->getEntityType() != "platformModule") {
       nestedTree = getStateStructInformationForDeclaration(nestedFuncDecl,
                                                            funcScope, tree);
       nestedTree.instance = nestedFunc; // Set instance to the call site
     }
     typeTree.nodes.push_back(nestedTree);
   } else if (node->getNodeType() == AST::Entity ||
-             node->getNodeType() == AST::Block ||
-             node->getNodeType() == AST::Array ||
-             node->getNodeType() == AST::Bundle) {
+             node->getNodeType() == AST::Array) {
     std::shared_ptr<DeclarationNode> outBlockDecl;
     NodeRole role =
         determineNodeRole(node, funcDecl, funcScope, tree, outBlockDecl);
@@ -2875,8 +2752,7 @@ void CodeAnalysis::processStreamNodeForDeclaration(
         typeTree.external.push_back({outBlockDecl, type});
       }
     }
-    if (node->getNodeType() == AST::Array ||
-        node->getNodeType() == AST::Bundle) {
+    if (node->getNodeType() == AST::Array) {
       auto indeces = std::static_pointer_cast<ArrayNode>(node)->index();
       if (indeces) {
         for (const auto &index : indeces->getChildren()) {
@@ -2922,12 +2798,11 @@ CodeAnalysis::TypeTree CodeAnalysis::getStateStructInformationForDeclaration(
   if (blocks && blocks->getNodeType() == AST::List) {
     for (const auto &blockNode : blocks->getChildren()) {
       if (blockNode->getNodeType() == AST::Declaration ||
-          blockNode->getNodeType() == AST::ArrayDeclaration ||
-          blockNode->getNodeType() == AST::BundleDeclaration) {
+          blockNode->getNodeType() == AST::ArrayDeclaration) {
         auto blockDecl = std::static_pointer_cast<DeclarationNode>(blockNode);
         std::shared_ptr<DeclarationNode> outBlockDecl;
         NodeRole role = determineNodeRole(blockNode, funcDecl, funcScope, tree,
-                                           outBlockDecl);
+                                          outBlockDecl);
         if (role == NodeRole::Persistent) {
           auto type = getDataTypeForDeclaration(blockDecl, funcScope, tree);
           typeTree.persistent.push_back({blockDecl, type});
@@ -3044,8 +2919,8 @@ CodeAnalysis::TypeTree::getDomainRootTree(std::string domainName) {
     if (tree.instance) {
       if (tree.instance->getNodeType() == AST::Declaration) {
         auto decl = std::static_pointer_cast<DeclarationNode>(tree.instance);
-        if (decl->getObjectType() == "_domainDefinition" ||
-            decl->getObjectType() == "gameDefinition") {
+        if (decl->getEntityType() == "_domainDefinition" ||
+            decl->getEntityType() == "gameDefinition") {
           if (decl->getName() == domainName) {
             return &tree;
           }

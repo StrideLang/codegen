@@ -26,13 +26,13 @@ TEST(CompilerProperties, ModuleInputPortBLock) {
       EXPECT_EQ(funcNode->getNodeType(), AST::Function);
       auto inputBlock = funcNode->getCompilerProperty("inputBlock");
       EXPECT_TRUE(inputBlock);
-      EXPECT_EQ(inputBlock->getNodeType(), AST::Block);
-      EXPECT_EQ(std::static_pointer_cast<BlockNode>(inputBlock)->getName(),
+      EXPECT_EQ(inputBlock->getNodeType(), AST::Entity);
+      EXPECT_EQ(std::static_pointer_cast<EntityNode>(inputBlock)->getName(),
                 "OuterInput");
       auto outputBlock = funcNode->getCompilerProperty("outputBlock");
       EXPECT_TRUE(outputBlock);
-      EXPECT_EQ(outputBlock->getNodeType(), AST::Block);
-      EXPECT_EQ(std::static_pointer_cast<BlockNode>(outputBlock)->getName(),
+      EXPECT_EQ(outputBlock->getNodeType(), AST::Entity);
+      EXPECT_EQ(std::static_pointer_cast<EntityNode>(outputBlock)->getName(),
                 "OuterOutput");
     }
   }

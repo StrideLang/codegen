@@ -133,7 +133,7 @@ void StrideFramework::installFramework() {
                 auto installDirective =
                     std::static_pointer_cast<DeclarationNode>(
                         installDirectiveNode);
-                if (installDirective->getObjectType() == "installAction") {
+                if (installDirective->getEntityType() == "installAction") {
                   // FIXME check for platform and language
                   auto commandNode =
                       installDirective->getPropertyValue("command");
@@ -238,7 +238,7 @@ std::vector<string> StrideFramework::getDomainIds() {
     for (const auto &node : treeEntry.nodes) {
       if (node->getNodeType() == AST::Declaration) {
         auto decl = static_pointer_cast<DeclarationNode>(node);
-        if (decl->getObjectType() == "_domainDefinition") {
+        if (decl->getEntityType() == "_domainDefinition") {
           domainIds.push_back(decl->getName());
         }
       }
@@ -294,7 +294,7 @@ bool StrideFramework::getPluginDetails(string &pluginName, int &majorVersion,
     for (const auto &declNode : tree.nodes) {
       if (declNode->getNodeType() == AST::Declaration) {
         auto decl = static_pointer_cast<DeclarationNode>(declNode);
-        if (decl->getObjectType() == "generatorDirectives") {
+        if (decl->getEntityType() == "generatorDirectives") {
           auto nameNode = decl->getPropertyValue("codeGenerator");
           if (nameNode && nameNode->getNodeType() == AST::String) {
             pluginName =
@@ -373,7 +373,7 @@ StrideFramework::getInheritedFrameworkPaths(std::string frameworkLibPath) {
   for (const auto &newNode : nodes) {
     if (newNode->getNodeType() == AST::Declaration) {
       auto decl = static_pointer_cast<DeclarationNode>(newNode);
-      if (decl->getObjectType() == "_frameworkDescription") {
+      if (decl->getEntityType() == "_frameworkDescription") {
         auto inheritsNode = decl->getPropertyValue("inherits");
         auto inheritsVersionNode = decl->getPropertyValue("inheritsVersion");
         if (inheritsNode && inheritsVersionNode &&
@@ -405,7 +405,7 @@ StrideFramework::loadInheritedList(string frameworkLibPath) {
       if (node->getNodeType() == AST::Declaration) {
         std::shared_ptr<DeclarationNode> nodeDeclaration =
             std::static_pointer_cast<DeclarationNode>(node);
-        if (nodeDeclaration->getObjectType() == "_frameworkDescription") {
+        if (nodeDeclaration->getEntityType() == "_frameworkDescription") {
           auto inheritsNode = nodeDeclaration->getPropertyValue("inherits");
           auto inheritsVersionNode =
               nodeDeclaration->getPropertyValue("inheritsVersion");
@@ -463,7 +463,7 @@ std::vector<ASTNode> StrideFramework::loadImport(string importName,
       if (fileTree) {
         for (const auto &child : fileTree->getChildren()) {
           if (child->getNodeType() == AST::Declaration ||
-              child->getNodeType() == AST::BundleDeclaration) {
+              child->getNodeType() == AST::ArrayDeclaration) {
             loaded.push_back(child);
           }
         }

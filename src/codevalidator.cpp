@@ -111,8 +111,8 @@ void CodeValidator::validate() {
     validatePlatform(m_tree, m_errors);
     ASTValidation::validateTypes(m_tree, m_errors, {}, m_tree, {}, "");
 
-    validateBundleIndeces(m_tree, m_errors, {});
-    validateBundleSizes(m_tree, m_errors, {});
+    validateArrayIndices(m_tree, m_errors, {});
+    validateArraySizes(m_tree, m_errors, {});
     validateSymbolUniqueness({{nullptr, m_tree->getChildren()}}, m_errors);
     validateStreamSizes(m_tree, m_errors, {});
     validateRates(m_tree);
@@ -121,15 +121,14 @@ void CodeValidator::validate() {
   sortErrors();
 }
 
-void CodeValidator::validateBundleIndeces(ASTNode node,
-                                          std::vector<LangError> &errors,
-                                          ScopeStack scope) {
-  if (node->getNodeType() == AST::Array || node->getNodeType() == AST::Bundle) {
+void CodeValidator::validateArrayIndices(ASTNode node,
+                                         std::vector<LangError> &errors,
+                                         ScopeStack scope) {
+  if (node->getNodeType() == AST::Array) {
     ArrayNode *bundle = static_cast<ArrayNode *>(node.get());
     auto index = bundle->index();
     if (index->getNodeType() != AST::Int &&
         index->getNodeType() != AST::MemberAccess &&
-        index->getNodeType() != AST::PortProperty &&
         index->getNodeType() != AST::Range &&
         index->getNodeType() != AST::List) {
       LangError error;
@@ -140,24 +139,23 @@ void CodeValidator::validateBundleIndeces(ASTNode node,
     }
   }
   for (const ASTNode &child : node->getChildren()) {
-    validateBundleIndeces(child, errors, scope);
+    validateArrayIndices(child, errors, scope);
   }
 }
 
-void CodeValidator::validateBundleSizes(ASTNode node,
-                                        std::vector<LangError> &errors,
-                                        ScopeStack scope) {
-  if (node->getNodeType() == AST::ArrayDeclaration ||
-      node->getNodeType() == AST::BundleDeclaration) {
+void CodeValidator::validateArraySizes(ASTNode node,
+                                       std::vector<LangError> &errors,
+                                       ScopeStack scope) {
+  if (node->getNodeType() == AST::ArrayDeclaration) {
     std::shared_ptr<DeclarationNode> declaration =
         std::static_pointer_cast<DeclarationNode>(node);
     // FIXME this needs to be rewritten looking at the port entity size
     int size =
-        ASTQuery::getBlockDeclaredSize(declaration, scope, m_tree, &errors);
+        ASTQuery::getEntityDeclaredSize(declaration, scope, m_tree, &errors);
     int datasize = getEntityDataSize(declaration, scope, &errors);
     if (size != datasize && datasize > 1) {
       LangError error;
-      error.type = LangError::BundleSizeMismatch;
+      error.type = LangError::ArraySizeMismatch;
       error.lineNumber = node->getLine();
       error.errorTokens.push_back(declaration->getArrayIndex()->getName());
       error.errorTokens.push_back(std::to_string(size));
@@ -175,7 +173,7 @@ void CodeValidator::validateBundleSizes(ASTNode node,
 
   std::vector<ASTNode> children = node->getChildren();
   for (const ASTNode &node : children) {
-    validateBundleSizes(node, errors, scope);
+    validateArraySizes(node, errors, scope);
   }
 }
 
@@ -186,8 +184,7 @@ void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
 
   for (const auto &node : scopeNodes) {
     if (node->getNodeType() == AST::Declaration ||
-        node->getNodeType() == AST::ArrayDeclaration ||
-        node->getNodeType() == AST::BundleDeclaration) {
+        node->getNodeType() == AST::ArrayDeclaration) {
       std::string name = static_cast<DeclarationNode *>(node.get())->getName();
       if (!name.empty()) {
         declsByName[name].push_back(node);
@@ -309,9 +306,9 @@ void CodeValidator::validateStreamSizes(ASTNode tree,
     } else if (node->getNodeType() == AST::Declaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
       if (decl) {
-        if (decl->getObjectType() == "module" ||
-            decl->getObjectType() == "reaction" ||
-            decl->getObjectType() == "loop") {
+        if (decl->getEntityType() == "module" ||
+            decl->getEntityType() == "reaction" ||
+            decl->getEntityType() == "loop") {
           auto subScope = scope;
           subScope.push_back(
               {decl, decl->getPropertyValue("blocks")->getChildren()});
@@ -350,10 +347,9 @@ void CodeValidator::validateConstraints(ASTNode tree) {
 
 void CodeValidator::validateNodeRate(ASTNode node, ASTNode tree) {
   if (node->getNodeType() == AST::Declaration ||
-      node->getNodeType() == AST::ArrayDeclaration ||
-      node->getNodeType() == AST::BundleDeclaration) {
+      node->getNodeType() == AST::ArrayDeclaration) {
     DeclarationNode *decl = static_cast<DeclarationNode *>(node.get());
-    if (decl->getObjectType() == "signal") {
+    if (decl->getEntityType() == "signal") {
       //            if (findRateInProperties(decl->getProperties(), {}, tree) <
       //            0) {
       //                LangError error;
@@ -473,8 +469,7 @@ std::vector<ASTNode> CodeValidator::resolveConstraintNode(
     std::shared_ptr<FunctionNode> function,
     std::shared_ptr<DeclarationNode> declaration, ScopeStack scopeStack,
     ASTNode tree) {
-  if (node->getNodeType() == AST::MemberAccess ||
-      node->getNodeType() == AST::PortProperty) {
+  if (node->getNodeType() == AST::MemberAccess) {
     auto pp = std::static_pointer_cast<MemberAccessNode>(node);
     if (pp->getPropertyName() == "size") {
       return {std::make_shared<ValueNode>(
@@ -508,8 +503,7 @@ std::vector<ASTNode> CodeValidator::resolveConstraintNode(
       m_errors.push_back(err);
     }
     return output;
-  } else if (node->getNodeType() == AST::Entity ||
-             node->getNodeType() == AST::Block) {
+  } else if (node->getNodeType() == AST::Entity) {
 
   } else if (node->getNodeType() == AST::List) {
     std::vector<ASTNode> resolvedList;
@@ -561,12 +555,12 @@ void CodeValidator::validateStreamInputSize(StreamNode *stream,
     rightDecl = ASTQuery::findDeclarationByName(ASTQuery::getNodeName(right),
                                                 scope, m_tree);
   }
-  if ((leftDecl && leftDecl->getObjectType() == "buffer") ||
-      (rightDecl && rightDecl->getObjectType() == "buffer")) {
+  if ((leftDecl && leftDecl->getEntityType() == "buffer") ||
+      (rightDecl && rightDecl->getEntityType() == "buffer")) {
     // FIXME how should buffer size be validated?
 
-  } else if ((leftDecl && leftDecl->getObjectType() == "table") ||
-             (rightDecl && rightDecl->getObjectType() == "table")) {
+  } else if ((leftDecl && leftDecl->getEntityType() == "table") ||
+             (rightDecl && rightDecl->getEntityType() == "table")) {
     // FIXME how should table size be validated?
 
   } else {

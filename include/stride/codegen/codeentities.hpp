@@ -9,7 +9,7 @@
 #include "stride/parser/ast.h"
 #include "stride/parser/declarationnode.h"
 //#include "stride/parser/functionnode.h"
-#include "stride/parser/portpropertynode.h"
+#include "stride/parser/memberaccessnode.h"
 
 namespace strd {
 typedef enum {
@@ -101,7 +101,7 @@ typedef struct {
   ASTNode externalConnection;
   std::vector<std::string> parentList;
   SignalAccess access;
-  std::shared_ptr<PortPropertyNode> parentScopeProperty;
+  std::shared_ptr<MemberAccessNode> parentScopeProperty;
 } DeclarationMap;
 
 typedef struct {
@@ -141,7 +141,7 @@ public:
   // generated in this domain
   std::vector<FunctionCall> moduleCalls;
 
-  std::map<std::shared_ptr<PortPropertyNode>, std::string> portPropertiesMap;
+  std::map<std::shared_ptr<MemberAccessNode>, std::string> portPropertiesMap;
 
   void append(DomainCode newCode) {
     scopeEntities.insert(scopeEntities.end(), newCode.scopeEntities.begin(),
@@ -183,9 +183,9 @@ public:
       bool propertyRegistered = false;
       std::string domainId;
       for (auto entry : portPropertiesMap) { // Check if property already there.
-        std::shared_ptr<PortPropertyNode> portProp = entry.first;
-        if (portProp->getName() == newEntry.first->getName() &&
-            portProp->getPortName() == newEntry.first->getPortName()) {
+        std::shared_ptr<MemberAccessNode> portProp = entry.first;
+        if (portProp->getEntity() == newEntry.first->getEntity() &&
+            portProp->getPropertyName() == newEntry.first->getPropertyName()) {
           propertyRegistered = true;
           break;
         }
@@ -256,9 +256,9 @@ public:
       bool propertyRegistered = false;
       std::string domainId;
       for (auto entry : portPropertiesMap) { // Check if property already there.
-        std::shared_ptr<PortPropertyNode> portProp = entry.first;
-        if (portProp->getName() == newEntry.first->getName() &&
-            portProp->getPortName() == newEntry.first->getPortName()) {
+        std::shared_ptr<MemberAccessNode> portProp = entry.first;
+        if (portProp->getEntity() == newEntry.first->getEntity() &&
+            portProp->getPropertyName() == newEntry.first->getPropertyName()) {
           propertyRegistered = true;
           break;
         }

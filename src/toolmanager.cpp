@@ -1,11 +1,11 @@
-﻿#include "stride/codegen/toolmanager.hpp"
+#include "stride/codegen/toolmanager.hpp"
 
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 
-#include "stride/parser/blocknode.h"
+#include "stride/parser/entitynode.h"
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/valuenode.h"
 #include "stride/utils/astfunctions.h"
@@ -37,7 +37,7 @@ void ToolManager::readTemplates() {
         for (auto child : tree->getChildren()) {
           if (child->getNodeType() == AST::Declaration) {
             auto decl = std::static_pointer_cast<DeclarationNode>(child);
-            if (decl->getObjectType() == "toolTemplate") { // ----------------
+            if (decl->getEntityType() == "toolTemplate") { // ----------------
               auto platformsNode = decl->getPropertyValue("platforms");
               if (platformsNode && platformsNode->getNodeType() == AST::List) {
                 bool validPlatform = false;
@@ -71,8 +71,8 @@ void ToolManager::readTemplates() {
                   }
                   std::string output;
                   auto outputNode = decl->getPropertyValue("output");
-                  if (outputNode && outputNode->getNodeType() == AST::Block) {
-                    output = std::static_pointer_cast<BlockNode>(outputNode)
+                  if (outputNode && outputNode->getNodeType() == AST::Entity) {
+                    output = std::static_pointer_cast<EntityNode>(outputNode)
                                  ->getName();
                   }
                   std::string meta;
@@ -95,7 +95,7 @@ void ToolManager::readTemplates() {
                 std::cerr << "ERROR in platforms port in toolTemplate"
                           << std::endl;
               }
-            } else if (decl->getObjectType() == "toolSearch") { // -----------
+            } else if (decl->getEntityType() == "toolSearch") { // -----------
               auto platformsNode = decl->getPropertyValue("platforms");
               if (platformsNode && platformsNode->getNodeType() == AST::List) {
                 bool validPlatform = false;
@@ -123,9 +123,9 @@ void ToolManager::readTemplates() {
                   auto toolTemplateNode =
                       decl->getPropertyValue("toolTemplate");
                   if (toolTemplateNode &&
-                      toolTemplateNode->getNodeType() == AST::Block) {
+                      toolTemplateNode->getNodeType() == AST::Entity) {
                     toolTemplate =
-                        std::static_pointer_cast<BlockNode>(toolTemplateNode)
+                        std::static_pointer_cast<EntityNode>(toolTemplateNode)
                             ->getName();
                   }
                   std::string rootPathRegex;
@@ -168,7 +168,7 @@ void ToolManager::readTemplates() {
                 std::cerr << "ERROR in platforms port in toolSearch"
                           << std::endl;
               }
-            } else if (decl->getObjectType() ==
+            } else if (decl->getEntityType() ==
                        "pathTemplate") { // ----------------
               auto platformsNode = decl->getPropertyValue("platforms");
               if (platformsNode && platformsNode->getNodeType() == AST::List) {
@@ -203,8 +203,8 @@ void ToolManager::readTemplates() {
                   }
                   std::string output;
                   auto outputNode = decl->getPropertyValue("output");
-                  if (outputNode && outputNode->getNodeType() == AST::Block) {
-                    output = std::static_pointer_cast<BlockNode>(outputNode)
+                  if (outputNode && outputNode->getNodeType() == AST::Entity) {
+                    output = std::static_pointer_cast<EntityNode>(outputNode)
                                  ->getName();
                   }
                   std::string meta;
@@ -227,7 +227,7 @@ void ToolManager::readTemplates() {
                 std::cerr << "ERROR in platforms port in pathTemplate"
                           << std::endl;
               }
-            } else if (decl->getObjectType() == "pathSearch") { // -----------
+            } else if (decl->getEntityType() == "pathSearch") { // -----------
               auto platformsNode = decl->getPropertyValue("platforms");
               if (platformsNode && platformsNode->getNodeType() == AST::List) {
                 bool validPlatform = false;
@@ -255,9 +255,9 @@ void ToolManager::readTemplates() {
                   auto toolTemplateNode =
                       decl->getPropertyValue("pathTemplate");
                   if (toolTemplateNode &&
-                      toolTemplateNode->getNodeType() == AST::Block) {
+                      toolTemplateNode->getNodeType() == AST::Entity) {
                     pathTemplate =
-                        std::static_pointer_cast<BlockNode>(toolTemplateNode)
+                        std::static_pointer_cast<EntityNode>(toolTemplateNode)
                             ->getName();
                   }
                   std::string rootPathRegex;
@@ -319,7 +319,7 @@ void ToolManager::readLocalConfigs() {
         for (const auto &child : tree->getChildren()) {
           if (child->getNodeType() == AST::Declaration) {
             auto decl = std::static_pointer_cast<DeclarationNode>(child);
-            if (decl->getObjectType() == "toolInstance") {
+            if (decl->getEntityType() == "toolInstance") {
               auto executableNode = decl->getPropertyValue("executable");
               if (executableNode &&
                   executableNode->getNodeType() == AST::String) {
@@ -332,7 +332,7 @@ void ToolManager::readLocalConfigs() {
                 std::cerr << "ERROR: Invalid executable port in tool instance "
                           << file.path() << std::endl;
               }
-            } else if (decl->getObjectType() == "pathInstance") {
+            } else if (decl->getEntityType() == "pathInstance") {
               auto pathNode = decl->getPropertyValue("path");
               if (pathNode && pathNode->getNodeType() == AST::String) {
                 std::string path = std::static_pointer_cast<ValueNode>(pathNode)

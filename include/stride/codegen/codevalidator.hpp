@@ -65,10 +65,10 @@ private:
 
   void validatePlatform(ASTNode node, std::vector<LangError> &errors);
 
-  void validateBundleIndeces(ASTNode node, std::vector<LangError> &errors,
-                             ScopeStack scope);
-  void validateBundleSizes(ASTNode node, std::vector<LangError> &errors,
-                           ScopeStack scope);
+  void validateArrayIndices(ASTNode node, std::vector<LangError> &errors,
+                            ScopeStack scope);
+  void validateArraySizes(ASTNode node, std::vector<LangError> &errors,
+                          ScopeStack scope);
   void validateSymbolUniqueness(ScopeStack scope,
                                 std::vector<LangError> &errors);
   void validateStreamSizes(ASTNode tree, std::vector<LangError> &errors,
@@ -103,11 +103,6 @@ private:
   int getEntityDataSize(std::shared_ptr<DeclarationNode> declaration,
                         ScopeStack scope,
                         std::vector<LangError> *errors = nullptr);
-  int getBlockDataSize(std::shared_ptr<DeclarationNode> declaration,
-                       ScopeStack scope,
-                       std::vector<LangError> *errors = nullptr) {
-    return getEntityDataSize(declaration, scope, errors);
-  }
 
   std::shared_ptr<StrideSystem> m_system;
   ASTNode m_tree;

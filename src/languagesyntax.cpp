@@ -354,18 +354,18 @@ std::string LanguageSyntax::getDataType(std::shared_ptr<DeclarationNode> decl,
     frameworkName =
         std::static_pointer_cast<ValueNode>(frameworkNode)->getStringValue();
   }
-  if (decl->getObjectType() == "switch" ||
-      decl->getObjectType() == "reaction") {
+  if (decl->getEntityType() == "switch" ||
+      decl->getEntityType() == "reaction") {
     // TODO get this from platform defintions
     return "bool /*FIXME languagesyntax.cpp*/";
   }
   // FIXME need to get type from input block if module or loop
 
   auto declaredType = decl->getPropertyValue("type");
-  if (declaredType && declaredType->getNodeType() == AST::Block) {
+  if (declaredType && declaredType->getNodeType() == AST::Entity) {
     // FIXME we need to determine framework
     auto dataTypeDecl = system->getFrameworkDataType(
-        "", std::static_pointer_cast<BlockNode>(declaredType)->getName());
+        "", std::static_pointer_cast<EntityNode>(declaredType)->getName());
     if (dataTypeDecl) {
       auto frameworkTypeNode = dataTypeDecl->getPropertyValue("frameworkName");
 
@@ -378,13 +378,13 @@ std::string LanguageSyntax::getDataType(std::shared_ptr<DeclarationNode> decl,
   }
 
   auto defaultDataType =
-      system->getFrameworkDefaultDataType(frameworkName, decl->getObjectType());
+      system->getFrameworkDefaultDataType(frameworkName, decl->getEntityType());
 
   auto dataTypeNode =
       system->getFrameworkDataType(frameworkName, defaultDataType);
 
   if (!dataTypeNode || dataTypeNode->getNodeType() == AST::None) {
-    // std::cout << "undefined data type for " << decl->getObjectType()
+    // std::cout << "undefined data type for " << decl->getEntityType()
     //           << ". Using framework default." << std::endl;
     defaultDataType = system->getFrameworkDefaultDataType(frameworkName, "");
     dataTypeNode = system->getFrameworkDataType(frameworkName, defaultDataType);
