@@ -220,6 +220,13 @@ void CodeResolver::desugarSingleEntryStreams(ASTNode node,
   if (node->getNodeType() == AST::Declaration ||
       node->getNodeType() == AST::ArrayDeclaration) {
     auto decl = std::static_pointer_cast<DeclarationNode>(node);
+    auto streamBlocks =
+        ASTQuery::getContainedStreamBlocks(decl, ScopeStack(), m_tree);
+    for (const auto &block : streamBlocks) {
+      for (const auto &stream : block.streams) {
+        desugarSingleEntryStreams(stream, visited);
+      }
+    }
     for (const auto &prop : decl->getProperties()) {
       if (prop && prop->getValue()) {
         desugarSingleEntryStreams(prop->getValue(), visited);
@@ -505,10 +512,6 @@ void CodeResolver::markNodePersistence(ASTNode streamsList, ASTNode blocksList,
                               "persistent", std::make_shared<ValueNode>(
                                                 true, __FILE__, __LINE__));
                         }
-                      } else {
-                        std::cerr << __FILE__ << ":" << __LINE__
-                                  << " Error: could not find declaration for: "
-                                  << blockDeclInternal;
                       }
                     }
                   }
@@ -526,31 +529,49 @@ void CodeResolver::markNodePersistence(ASTNode streamsList, ASTNode blocksList,
 
 void CodeResolver::analyzeChildConnections(ASTNode node,
                                            ScopeStack scopeStack) {
+  if (!node) {
+    return;
+  }
+
   for (const ASTNode &object : node->getChildren()) {
-    //        We need to check streams on the root but also streams within
-    //        modules and reactions
-    if (object->getNodeType() == AST::Declaration) {
-      std::shared_ptr<DeclarationNode> decl =
-          std::static_pointer_cast<DeclarationNode>(object);
-      if (decl->getEntityType() == "module" ||
-          decl->getEntityType() == "reaction" ||
-          decl->getEntityType() == "loop") {
-        std::vector<ASTNode> streams = getModuleStreams(decl);
-        ASTNode blocks = decl->getPropertyValue("blocks");
-        scopeStack.push_back({decl, blocks->getChildren()});
-
-        for (const ASTNode &stream : streams) {
-          checkStreamConnections(std::static_pointer_cast<StreamNode>(stream),
-                                 scopeStack);
-        }
-
-        // prepend current scope
-        analyzeChildConnections(blocks, scopeStack);
-      }
-    } else if (object->getNodeType() == AST::Stream) {
+    if (object->getNodeType() == AST::Stream) {
       checkStreamConnections(std::static_pointer_cast<StreamNode>(object),
-                             ScopeStack());
+                             scopeStack);
     }
+  }
+
+  auto getDeclarations = [](ASTNode n) {
+    std::vector<std::shared_ptr<DeclarationNode>> decls;
+    if (!n) {
+      return decls;
+    }
+    for (const auto &child : n->getChildren()) {
+      if (child->getNodeType() == AST::Declaration ||
+          child->getNodeType() == AST::ArrayDeclaration) {
+        decls.push_back(std::static_pointer_cast<DeclarationNode>(child));
+      }
+    }
+    return decls;
+  };
+
+  for (const auto &decl : getDeclarations(node)) {
+    auto streamBlocks =
+        ASTQuery::getContainedStreamBlocks(decl, scopeStack, m_tree);
+    ASTNode blocks = decl->getPropertyValue("blocks");
+    if (streamBlocks.empty() && !blocks) {
+      continue;
+    }
+    scopeStack.push_back(
+        {decl, blocks ? blocks->getChildren() : std::vector<ASTNode>{}});
+    for (const auto &block : streamBlocks) {
+      for (const auto &stream : block.streams) {
+        checkStreamConnections(stream, scopeStack);
+      }
+    }
+    if (blocks) {
+      analyzeChildConnections(blocks, scopeStack);
+    }
+    scopeStack.pop_back();
   }
 }
 
@@ -2488,7 +2509,9 @@ CodeResolver::getModuleStreams(std::shared_ptr<DeclarationNode> module) {
   std::vector<ASTNode> streams;
 
   ASTNode streamsNode = module->getPropertyValue("streams");
-  assert(streamsNode);
+  if (!streamsNode) {
+    return streams;
+  }
   if (streamsNode->getNodeType() == AST::Stream) {
     streams.push_back(streamsNode);
   } else if (streamsNode->getNodeType() == AST::List) {
@@ -2822,38 +2845,33 @@ void CodeResolver::resolveStreamSymbols() {
     } else if (node->getNodeType() == AST::Declaration) {
       std::shared_ptr<DeclarationNode> decl =
           std::static_pointer_cast<DeclarationNode>(node);
-      // "module", "loop" and "reaction" inherit from _CodeGenerator. The
-      // user can also inherit from _CodeGenerator to force parsing and code
-      // resolution for streams and blocks in their types
       ScopeStack scope;
-      auto typeDecl = ASTQuery::findTypeDeclarationByName(decl->getEntityType(),
-                                                          scope, m_tree);
-      if (ASTQuery::isCodeGenerator(typeDecl, scope, m_tree)) {
-        std::vector<ASTNode> streams = getModuleStreams(decl);
+      auto streamBlocks =
+          ASTQuery::getContainedStreamBlocks(decl, scope, m_tree);
+      if (!streamBlocks.empty()) {
         ScopeStack scopeStack;
         ASTNode blocks = decl->getPropertyValue("blocks");
         if (blocks && blocks->getNodeType() == AST::List) {
           scopeStack.push_back({node, blocks->getChildren()});
         }
-        auto rit = streams.rbegin();
-        while (rit != streams.rend()) {
-          const ASTNode streamNode = *rit;
-          if (streamNode->getNodeType() == AST::Stream) {
-            std::shared_ptr<StreamNode> stream =
-                std::static_pointer_cast<StreamNode>(streamNode);
+        for (auto blockIt = streamBlocks.rbegin();
+             blockIt != streamBlocks.rend(); ++blockIt) {
+          for (auto sIt = blockIt->streams.rbegin();
+               sIt != blockIt->streams.rend(); ++sIt) {
+            std::shared_ptr<StreamNode> stream = *sIt;
             std::vector<ASTNode> declarations = declareUnknownStreamSymbols(
                 stream, nullptr, scopeStack, m_tree);
             std::shared_ptr<ListNode> blockList =
                 std::static_pointer_cast<ListNode>(
                     decl->getPropertyValue("blocks"));
-            assert(blockList && blockList->getNodeType() == AST::List);
-            for (const ASTNode &newDecl : declarations) {
-              blockList->addChild(newDecl);
+            if (blockList && blockList->getNodeType() == AST::List) {
+              for (const ASTNode &newDecl : declarations) {
+                blockList->addChild(newDecl);
+              }
+              // FIXME is this needed ?
+              scopeStack.push_back({node, blockList->getChildren()});
             }
-            // FIXME is this needed ?
-            scopeStack.push_back({node, blockList->getChildren()});
           }
-          rit++;
         }
       }
     }
@@ -2976,10 +2994,15 @@ void CodeResolver::propagateDomainsForNode(ASTNode node,
   } else if (node->getNodeType() == AST::Declaration) {
     std::shared_ptr<DeclarationNode> module =
         std::static_pointer_cast<DeclarationNode>(node);
-    if (module->getEntityType() == "module" ||
-        module->getEntityType() == "reaction" ||
-        module->getEntityType() == "loop") {
-      std::vector<ASTNode> streamsNode = getModuleStreams(module);
+    auto streamBlocks =
+        ASTQuery::getContainedStreamBlocks(module, scopeStack, m_tree);
+    if (!streamBlocks.empty() || module->getPropertyValue("blocks")) {
+      std::vector<ASTNode> streamsNode;
+      for (const auto &b : streamBlocks) {
+        for (const auto &s : b.streams) {
+          streamsNode.push_back(s);
+        }
+      }
       std::vector<ASTNode>::reverse_iterator streamIt = streamsNode.rbegin();
 
       std::vector<ASTNode> blocks = ASTQuery::getModuleEntities(module);

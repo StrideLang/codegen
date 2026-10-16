@@ -78,6 +78,9 @@ std::vector<std::string> CodeAnalysis::getUsedFrameworks(ASTNode tree) {
 
 ASTNode CodeAnalysis::getInstance(ASTNode block, ScopeStack scopeStack,
                                   ASTNode tree) {
+  if (!block) {
+    return nullptr;
+  }
   ASTNode inst;
   if (block->getNodeType() == AST::List) {
     inst = block;
@@ -1003,8 +1006,14 @@ int CodeAnalysis::evaluateSizeMemberAccess(
                     scopeStack.back();
                 scopeStack.pop_back();
                 // We need to look one scope up.
-                portSize = CodeAnalysis::getNodeNumOutputs(
-                    func->getCompilerProperty("inputBlock"), scopeStack, tree);
+                auto inBlock =
+                    func ? func->getCompilerProperty("inputBlock") : nullptr;
+                if (inBlock) {
+                  portSize = CodeAnalysis::getNodeNumOutputs(
+                      inBlock, scopeStack, tree);
+                } else {
+                  portSize = 1;
+                }
                 scopeStack.push_back(innerScope);
               }
 
@@ -1086,8 +1095,13 @@ double CodeAnalysis::evaluateRateMemberAccess(
             double rate =
                 CodeAnalysis::resolveRate(portBlock, scopeStack, tree, false);
             if (rate == -1) {
-              auto resolvedBlock = CodeAnalysis::getInstance(
-                  func->getCompilerProperty("inputBlock"), scopeStack, tree);
+              auto inBlock =
+                  func ? func->getCompilerProperty("inputBlock") : nullptr;
+              if (!inBlock) {
+                return 1.0;
+              }
+              auto resolvedBlock =
+                  CodeAnalysis::getInstance(inBlock, scopeStack, tree);
               auto scopeStackOuter = scopeStack;
               for (const auto &subScope : scopeStack) {
                 rate = CodeAnalysis::resolveRate(resolvedBlock, scopeStack,
@@ -1219,16 +1233,14 @@ CodeAnalysis::getUsedMemberAccesses(std::shared_ptr<DeclarationNode> funcDecl) {
     }
   }
 
-  auto streams = funcDecl->getPropertyValue("streams");
-  if (streams) {
-    for (const auto &streamNode : streams->getChildren()) {
-      if (streamNode->getNodeType() == AST::Stream) {
-        StreamNodeIterator it(std::static_pointer_cast<StreamNode>(streamNode));
-        while (it.hasNext()) {
-          ASTNode node = it.next();
-          auto newUsed = getUsedMemberAccessesInNode(node);
-          used.insert(used.end(), newUsed.begin(), newUsed.end());
-        }
+  auto streamBlocks = ASTQuery::getContainedStreamBlocks(funcDecl, {}, nullptr);
+  for (const auto &block : streamBlocks) {
+    for (const auto &stream : block.streams) {
+      StreamNodeIterator it(stream);
+      while (it.hasNext()) {
+        ASTNode node = it.next();
+        auto newUsed = getUsedMemberAccessesInNode(node);
+        used.insert(used.end(), newUsed.begin(), newUsed.end());
       }
     }
   }
@@ -1288,16 +1300,14 @@ std::vector<ASTNode> CodeAnalysis::getUsedEntitiesInNode(ASTNode node) {
 std::vector<ASTNode> CodeAnalysis::getUsedEntitiesInStreams(
     std::shared_ptr<DeclarationNode> funcDecl) {
   std::vector<ASTNode> used;
-  auto streams = funcDecl->getPropertyValue("streams");
-  if (streams) {
-    for (const auto &streamNode : streams->getChildren()) {
-      if (streamNode->getNodeType() == AST::Stream) {
-        StreamNodeIterator it(std::static_pointer_cast<StreamNode>(streamNode));
-        while (it.hasNext()) {
-          ASTNode node = it.next();
-          auto newUsed = getUsedEntitiesInNode(node);
-          used.insert(used.end(), newUsed.begin(), newUsed.end());
-        }
+  auto streamBlocks = ASTQuery::getContainedStreamBlocks(funcDecl, {}, nullptr);
+  for (const auto &block : streamBlocks) {
+    for (const auto &stream : block.streams) {
+      StreamNodeIterator it(stream);
+      while (it.hasNext()) {
+        ASTNode node = it.next();
+        auto newUsed = getUsedEntitiesInNode(node);
+        used.insert(used.end(), newUsed.begin(), newUsed.end());
       }
     }
   }
@@ -1331,6 +1341,9 @@ double CodeAnalysis::resolveRate(ASTNode node, ScopeStack scopeStack,
 int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
                                     ASTNode tree,
                                     std::vector<LangError> *errors) {
+  if (!node) {
+    return 1;
+  }
   if (node->getNodeType() == AST::List) {
     int size = 0;
     for (const ASTNode &member : node->getChildren()) {
@@ -2504,10 +2517,13 @@ void CodeAnalysis::processStreamNode(ASTNode streamNode,
             funcScope.push_back(scope.back());
           }
         }
-        funcScope.push_back({func, blocks->getChildren()});
-        if (streams) {
-          for (const auto &stream : streams->getChildren()) {
-            StreamNodeIterator it(std::static_pointer_cast<StreamNode>(stream));
+        funcScope.push_back(
+            {func, blocks ? blocks->getChildren() : std::vector<ASTNode>{}});
+        auto streamBlocks =
+            ASTQuery::getContainedStreamBlocks(funcDecl, funcScope, tree);
+        for (const auto &block : streamBlocks) {
+          for (const auto &stream : block.streams) {
+            StreamNodeIterator it(stream);
             while (it.hasNext()) {
               processStreamNode(it.next(), funcScope, tree, functionTree);
             }
@@ -2857,9 +2873,10 @@ CodeAnalysis::TypeTree CodeAnalysis::getStateStructInformationForDeclaration(
     }
   }
 
-  auto streams = funcDecl->getPropertyValue("streams");
-  if (streams && streams->getNodeType() == AST::List) {
-    for (const auto &stream : streams->getChildren()) {
+  auto streamBlocks =
+      ASTQuery::getContainedStreamBlocks(funcDecl, funcScope, tree);
+  for (const auto &block : streamBlocks) {
+    for (const auto &stream : block.streams) {
       processStreamNodeForDeclaration(stream, funcDecl, funcScope, tree,
                                       typeTree);
     }
