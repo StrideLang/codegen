@@ -118,7 +118,7 @@ private:
                          ASTNode resolvingInstance, ASTNode domainName,
                          ScopeStack scopeStack);
 
-  std::vector<ASTNode> declareUnknownName(std::shared_ptr<EntityNode> block,
+  std::vector<ASTNode> declareUnknownName(std::shared_ptr<EntityNode> entityNode,
                                           int size, ScopeStack localScope,
                                           ASTNode tree);
   std::vector<ASTNode> declareUnknownArray(std::shared_ptr<ArrayNode> name,
@@ -126,7 +126,7 @@ private:
                                            ASTNode tree);
   std::shared_ptr<DeclarationNode> createConstantDeclaration(std::string name,
                                                              ASTNode value);
-  void declareIfMissing(std::string name, ASTNode blockList, ASTNode value);
+  void declareIfMissing(std::string name, ASTNode declList, ASTNode value);
 
   std::vector<ASTNode>
   declareUnknownExpressionSymbols(std::shared_ptr<ExpressionNode> expr,

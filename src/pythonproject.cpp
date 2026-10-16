@@ -270,18 +270,18 @@ void PythonProject::astToJson(ASTNode node, QJsonObject &obj) {
   } else if (node->getNodeType() == AST::Switch) {
     obj["value"] = static_cast<ValueNode *>(node.get())->getSwitchValue();
   } else if (node->getNodeType() == AST::Declaration) {
-    DeclarationNode *block = static_cast<DeclarationNode *>(node.get());
+    DeclarationNode *decl = static_cast<DeclarationNode *>(node.get());
     QJsonObject newObject;
-    newObject["name"] = QString::fromStdString(block->getName());
-    newObject["type"] = QString::fromStdString(block->getEntityType());
-    std::vector<std::string> nsList = block->getNamespaceList();
+    newObject["name"] = QString::fromStdString(decl->getName());
+    newObject["type"] = QString::fromStdString(decl->getEntityType());
+    std::vector<std::string> nsList = decl->getNamespaceList();
     QString ns;
     for (std::string name : nsList) {
       ns += QString::fromStdString(name) + "::";
     }
     ns.chop(2);
     newObject["namespace"] = ns;
-    std::vector<std::shared_ptr<PropertyNode>> props = block->getProperties();
+    std::vector<std::shared_ptr<PropertyNode>> props = decl->getProperties();
     QJsonObject propObject;
     for (auto prop : props) {
       ASTNode propValue = prop->getValue();

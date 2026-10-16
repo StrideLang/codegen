@@ -202,9 +202,9 @@ public:
   };
 
   static NodeRole
-  determineNodeRole(ASTNode block, std::shared_ptr<DeclarationNode> funcDecl,
+  determineNodeRole(ASTNode entity, std::shared_ptr<DeclarationNode> funcDecl,
                     const ScopeStack &scope, ASTNode tree,
-                    std::shared_ptr<DeclarationNode> &outBlockDecl);
+                    std::shared_ptr<DeclarationNode> &outEntityDecl);
 
   static std::vector<ASTNode>
   getUsedEntitiesInStreams(std::shared_ptr<DeclarationNode> funcDecl);

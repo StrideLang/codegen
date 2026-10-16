@@ -43,7 +43,7 @@ endif()
 add_library(StrideCodegen ${CODEGEN_SRC} ${CODEGEN_HEADERS})
 
 set_property(TARGET StrideCodegen PROPERTY POSITION_INDEPENDENT_CODE ON) #-fPIC
-set_property(TARGET StrideCodegen PROPERTY CXX_STANDARD 17)
+set_property(TARGET StrideCodegen PROPERTY CXX_STANDARD 20)
 set_property(TARGET StrideCodegen PROPERTY CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(tests)

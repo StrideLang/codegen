@@ -78,9 +78,9 @@ std::string LanguageSyntax::getDeclarationForType(
 
   if (true) {
     //    if (access.access == ACCESS_NONE || access.access == ACCESS_SDRst) {
-    std::string bundleSize;
+    std::string arraySize;
     if (size > 1) {
-      bundleSize = "[" + std::to_string(size) + "]";
+      arraySize = "[" + std::to_string(size) + "]";
     }
     std::string constructorInitList;
     if (constructorArgs.size() > 0) {
@@ -90,7 +90,7 @@ std::string LanguageSyntax::getDeclarationForType(
       }
       constructorInitList.back() = '}';
     }
-    out += type + " " + name + bundleSize + constructorInitList;
+    out += type + " " + name + arraySize + constructorInitList;
     if (defaultValue.size() == 1) {
       out += " = ";
       uint64_t count = size;
