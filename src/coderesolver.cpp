@@ -4145,14 +4145,27 @@ void CodeResolver::resolveTypeCastForStream(std::shared_ptr<StreamNode> stream,
       next = std::static_pointer_cast<StreamNode>(next)->getLeft();
     }
     // TODO more detailed resolution with specific float and int types
-    if (left->getNodeType() == AST::List ||
+    bool isMultiArgFunctionCall = false;
+    if (left->getNodeType() == AST::List && next &&
+        next->getNodeType() == AST::Function) {
+      int numIn = CodeAnalysis::getNodeNumInputs(next, scopeStack, tree);
+      if (numIn > 1 || numIn == CodeAnalysis::SIZE_MEMBER_ACCESS) {
+        isMultiArgFunctionCall = true;
+      }
+    }
+    if ((left->getNodeType() == AST::List && !isMultiArgFunctionCall) ||
         left->getNodeType() == AST::Expression) {
       std::vector<std::string> types;
       std::string resolvedType;
       bool needsResolution = false;
+      bool validNumericList = true;
       for (const auto &listNode : left->getChildren()) {
         auto nodeType =
             CodeAnalysis::resolveNodeOutDataType(listNode, scopeStack, tree);
+        if (nodeType != "_IntType" && nodeType != "_RealType") {
+          validNumericList = false;
+          break;
+        }
         if (resolvedType.size() == 0) {
           resolvedType = nodeType;
         } else if (nodeType != resolvedType) {
@@ -4162,7 +4175,7 @@ void CodeResolver::resolveTypeCastForStream(std::shared_ptr<StreamNode> stream,
           needsResolution = true;
         }
       }
-      if (needsResolution) {
+      if (needsResolution && validNumericList) {
         for (auto &listNode : left->getChildren()) {
           if (CodeAnalysis::resolveNodeOutDataType(listNode, scopeStack,
                                                    tree) != resolvedType) {
@@ -4179,7 +4192,7 @@ void CodeResolver::resolveTypeCastForStream(std::shared_ptr<StreamNode> stream,
           CodeAnalysis::resolveNodeOutDataType(left, scopeStack, tree);
       auto nextType =
           CodeAnalysis::resolveNodeOutDataType(next, scopeStack, tree);
-      if (leftType != nextType) {
+      if (!leftType.empty() && !nextType.empty() && leftType != nextType) {
         left->setCompilerProperty(
             "typecast",
             std::make_shared<ValueNode>(nextType, __FILE__, __LINE__));

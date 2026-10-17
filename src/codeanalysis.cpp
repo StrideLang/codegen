@@ -1621,10 +1621,12 @@ int CodeAnalysis::getTypeNumInputs(
       auto outputList = blockDeclaration->getPropertyValue("inputs");
       if (outputList && outputList->getNodeType() == AST::List) {
         for (const auto &child : outputList->getChildren()) {
-          if (child && child->getNodeType() == AST::Declaration &&
-              std::static_pointer_cast<DeclarationNode>(child)
-                      ->getEntityType() == "constrainedList") {
-            return CodeAnalysis::SIZE_MEMBER_ACCESS;
+          if (child && child->getNodeType() == AST::Declaration) {
+            auto entType =
+                std::static_pointer_cast<DeclarationNode>(child)->getEntityType();
+            if (entType == "variadic" || entType == "constrainedList") {
+              return CodeAnalysis::SIZE_MEMBER_ACCESS;
+            }
           }
         }
         return outputList->getChildren().size();
@@ -1640,10 +1642,12 @@ int CodeAnalysis::getTypeNumInputs(
         auto inputs = typeDeclaration->getPropertyValue("inputs");
         if (inputs && inputs->getNodeType() == AST::List) {
           for (const auto &child : inputs->getChildren()) {
-            if (child && child->getNodeType() == AST::Declaration &&
-                std::static_pointer_cast<DeclarationNode>(child)
-                        ->getEntityType() == "constrainedList") {
-              return CodeAnalysis::SIZE_MEMBER_ACCESS;
+            if (child && child->getNodeType() == AST::Declaration) {
+              auto entType = std::static_pointer_cast<DeclarationNode>(child)
+                                 ->getEntityType();
+              if (entType == "variadic" || entType == "constrainedList") {
+                return CodeAnalysis::SIZE_MEMBER_ACCESS;
+              }
             }
           }
           internalSize = inputs->getChildren().size();
@@ -2177,6 +2181,8 @@ std::string CodeAnalysis::resolveEntityDataType(ASTNode node,
         return std::static_pointer_cast<EntityNode>(typeNode)->getName();
       }
       return "";
+    } else if (declaration->getEntityType() == "string") {
+      return "_StringType";
     } else if (declaration->getEntityType() == "switch" ||
                declaration->getEntityType() == "trigger") {
       return "_SwitchType";
