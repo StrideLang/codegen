@@ -810,8 +810,8 @@ std::vector<ASTNode> StrideSystem::getOptionTrees(std::string systemPath) {
           }
           optionTrees.push_back(finalTree);
         } else {
-          std::cerr << "Error parsing option file: " << file.path().c_str()
-                    << std::endl;
+          std::cerr << "Error parsing option file: "
+                    << file.path().generic_string() << std::endl;
         }
       }
     }

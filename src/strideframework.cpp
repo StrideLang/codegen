@@ -34,6 +34,7 @@
 #include "stride/parser/valuenode.h"
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
+#include "stride/utils/cachemanager.h"
 
 
 using namespace std;
@@ -390,7 +391,14 @@ StrideFramework::loadInheritedList(string frameworkLibPath) {
   std::vector<std::pair<std::string, std::string>> inh;
 
   std::string frameworkPath = frameworkLibPath + "/Framework.stride";
-  if (auto root = AST::parseFile(frameworkPath.c_str())) {
+  ASTNode root = CacheManager::instance().loadCachedAST(frameworkPath);
+  if (!root && std::filesystem::exists(frameworkPath)) {
+    root = AST::parseFile(frameworkPath.c_str());
+    if (root) {
+      CacheManager::instance().saveCachedAST(frameworkPath, root);
+    }
+  }
+  if (root) {
     for (const auto &node : root->getChildren()) {
       if (node->getNodeType() == AST::Declaration) {
         std::shared_ptr<DeclarationNode> nodeDeclaration =
@@ -449,7 +457,13 @@ std::vector<ASTNode> StrideFramework::loadImport(string importName,
     std::string filePath = baseDir + "/" + relPath + ".stride";
     if (std::filesystem::exists(filePath) &&
         std::filesystem::is_regular_file(filePath)) {
-      auto fileTree = AST::parseFile(filePath.c_str(), nullptr);
+      auto fileTree = CacheManager::instance().loadCachedAST(filePath);
+      if (!fileTree) {
+        fileTree = AST::parseFile(filePath.c_str(), nullptr);
+        if (fileTree) {
+          CacheManager::instance().saveCachedAST(filePath, fileTree);
+        }
+      }
       if (fileTree) {
         for (const auto &child : fileTree->getChildren()) {
           if (child->getNodeType() == AST::Declaration ||
