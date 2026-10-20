@@ -2392,24 +2392,264 @@ std::shared_ptr<DeclarationNode> CodeAnalysis::matchDefinitionToTypes(
     std::vector<std::shared_ptr<DeclarationNode>> decls,
     std::shared_ptr<FunctionNode> func, const ScopeStack &scope, ASTNode tree) {
   std::shared_ptr<DeclarationNode> funcDecl;
-  // First pass: check platformModule declarations
-  for (const auto &decl : decls) {
-    if (decl->getEntityType() == "platformModule") {
-      auto inputs = decl->getPropertyValue("inputs");
-      bool matches = true;
-      if (inputs) {
-        auto streamInput = func->getCompilerProperty("mainInput");
-        if (!streamInput) {
-          // declaration has input, but function in stream does not
-          continue;
-        }
-        if (inputs->getNodeType() != AST::List) {
-          matches = false;
+
+  // Gather actual input data types from func's mainInput
+  std::vector<std::string> actualTypes;
+  bool hasStreamInput = false;
+  auto streamInput = func ? func->getCompilerProperty("mainInput") : nullptr;
+  auto resolveInputType = [&](const ASTNode &node) -> std::string {
+    if (!node) {
+      return "";
+    }
+    // 1. Inspect "typecast" compiler property first
+    auto typecastProp = node->getCompilerProperty("typecast");
+    if (typecastProp && typecastProp->getNodeType() == AST::String) {
+      return std::static_pointer_cast<ValueNode>(typecastProp)
+              ->getStringValue();
+    }
+
+    // 2. Try direct resolveNodeOutDataType
+    std::string t = CodeAnalysis::resolveNodeOutDataType(node, scope, tree);
+    if (!t.empty()) {
+      return t;
+    }
+
+    // 3. Trace connected entity via resolveConnectionEntity
+    auto connDecl =
+        CodeAnalysis::resolveConnectionEntity(node, scope, tree, true);
+    if (!connDecl) {
+      connDecl =
+          CodeAnalysis::resolveConnectionEntity(node, scope, tree, false);
+    }
+    if (connDecl) {
+      t = CodeAnalysis::getDataTypeForDeclaration(connDecl, scope, tree);
+      if (!t.empty()) {
+        return t;
+      }
+    }
+
+    // 4. For FunctionNode (e.g. platform modules without ports), check outputs property
+    if (node->getNodeType() == AST::Function) {
+      auto prevFunc = std::static_pointer_cast<FunctionNode>(node);
+      auto prevDecls =
+          ASTQuery::findAllDeclarations(prevFunc->getName(), scope, tree);
+      for (const auto &pd : prevDecls) {
+        if (pd && pd->getEntityType() == "platformModule") {
+          auto outputsProp = pd->getPropertyValue("outputs");
+          if (outputsProp && outputsProp->getNodeType() == AST::List &&
+              !outputsProp->getChildren().empty()) {
+            auto outNode = outputsProp->getChildren()[0];
+            if (outNode->getNodeType() == AST::Entity) {
+              t = std::static_pointer_cast<EntityNode>(outNode)->getName();
+            } else if (outNode->getNodeType() == AST::String) {
+              t = std::static_pointer_cast<ValueNode>(outNode)
+                      ->getStringValue();
+            } else {
+              t = ASTQuery::getNodeName(outNode);
+            }
+            if (!t.empty())
+              break;
+          }
         }
       }
-      if (matches) {
+    }
+    return t;
+  };
+
+  if (streamInput) {
+    hasStreamInput = true;
+    if (streamInput->getNodeType() == AST::List) {
+      for (const auto &child : streamInput->getChildren()) {
+        actualTypes.push_back(resolveInputType(child));
+      }
+    } else {
+      actualTypes.push_back(resolveInputType(streamInput));
+    }
+  } else if (func) {
+    // If mainInput was not set, trace upstream connection using resolveConnectionEntity
+    auto connDecl =
+        CodeAnalysis::resolveConnectionEntity(func, scope, tree, false);
+    if (connDecl) {
+      std::string t =
+          CodeAnalysis::getDataTypeForDeclaration(connDecl, scope, tree);
+      if (!t.empty()) {
+        hasStreamInput = true;
+        actualTypes.push_back(t);
+      }
+    }
+  }
+
+  auto scoreCandidate =
+      [&](const std::shared_ptr<DeclarationNode> &decl) -> int {
+    if (decl->getEntityType() != "platformModule") {
+      return 0;
+    }
+    auto inputsNode = decl->getPropertyValue("inputs");
+    if (!inputsNode) {
+      return hasStreamInput ? -1 : 100;
+    }
+    if (!hasStreamInput) {
+      return -1;
+    }
+    if (inputsNode->getNodeType() != AST::List) {
+      return -1;
+    }
+
+    const auto &inputChildren = inputsNode->getChildren();
+
+    std::vector<std::string> fixedExpectedTypes;
+    std::shared_ptr<DeclarationNode> variadicDecl;
+    for (const auto &c : inputChildren) {
+      if (c && c->getNodeType() == AST::Declaration) {
+        auto d = std::static_pointer_cast<DeclarationNode>(c);
+        if (d->getEntityType() == "variadic" ||
+            d->getEntityType() == "constrainedList") {
+          variadicDecl = d;
+          break;
+        }
+      }
+      if (c->getNodeType() == AST::Entity) {
+        fixedExpectedTypes.push_back(
+            std::static_pointer_cast<EntityNode>(c)->getName());
+      } else if (c->getNodeType() == AST::String) {
+        fixedExpectedTypes.push_back(
+            std::static_pointer_cast<ValueNode>(c)->getStringValue());
+      } else {
+        fixedExpectedTypes.push_back(ASTQuery::getNodeName(c));
+      }
+    }
+
+    int score = 0;
+    if (!variadicDecl) {
+      if (fixedExpectedTypes.size() != actualTypes.size()) {
+        return -1;
+      }
+      for (size_t i = 0; i < actualTypes.size(); ++i) {
+        const auto &actual = actualTypes[i];
+        const auto &expected = fixedExpectedTypes[i];
+        if (actual.empty() || expected.empty()) {
+          score += 1;
+        } else if (actual == expected) {
+          score += 10;
+        } else if (actual == "_IntType" && expected == "_RealType") {
+          score += 5; // int to real promotion
+        } else {
+          return -1; // incompatible type
+        }
+      }
+      return score;
+    }
+
+    // Variadic case
+    if (actualTypes.size() < fixedExpectedTypes.size()) {
+      return -1;
+    }
+    for (size_t i = 0; i < fixedExpectedTypes.size(); ++i) {
+      const auto &actual = actualTypes[i];
+      const auto &expected = fixedExpectedTypes[i];
+      if (actual.empty() || expected.empty()) {
+        score += 1;
+      } else if (actual == expected) {
+        score += 10;
+      } else if (actual == "_IntType" && expected == "_RealType") {
+        score += 5;
+      } else {
+        return -1;
+      }
+    }
+
+    size_t variadicCount = actualTypes.size() - fixedExpectedTypes.size();
+    int minItems = 0;
+    int maxItems = -1;
+    auto minNode = variadicDecl->getPropertyValue("min");
+    if (!minNode)
+      minNode = variadicDecl->getPropertyValue("minItems");
+    if (minNode && minNode->getNodeType() == AST::Int) {
+      minItems = static_cast<int>(
+          std::static_pointer_cast<ValueNode>(minNode)->getIntValue());
+    } else if (variadicDecl->getEntityType() == "variadic") {
+      minItems = 1;
+    }
+    auto maxNode = variadicDecl->getPropertyValue("max");
+    if (!maxNode)
+      maxNode = variadicDecl->getPropertyValue("maxItems");
+    if (maxNode && maxNode->getNodeType() == AST::Int) {
+      maxItems = static_cast<int>(
+          std::static_pointer_cast<ValueNode>(maxNode)->getIntValue());
+    }
+    if (static_cast<int>(variadicCount) < minItems)
+      return -1;
+    if (maxItems >= 0 && static_cast<int>(variadicCount) > maxItems)
+      return -1;
+
+    std::vector<std::string> allowedTypes;
+    auto typesNode = variadicDecl->getPropertyValue("types");
+    if (typesNode && typesNode->getNodeType() == AST::List) {
+      for (const auto &tc : typesNode->getChildren()) {
+        if (tc->getNodeType() == AST::Entity) {
+          allowedTypes.push_back(
+              std::static_pointer_cast<EntityNode>(tc)->getName());
+        } else if (tc->getNodeType() == AST::String) {
+          allowedTypes.push_back(
+              std::static_pointer_cast<ValueNode>(tc)->getStringValue());
+        } else {
+          allowedTypes.push_back(ASTQuery::getNodeName(tc));
+        }
+      }
+    }
+
+    for (size_t i = fixedExpectedTypes.size(); i < actualTypes.size(); ++i) {
+      const auto &actual = actualTypes[i];
+      if (allowedTypes.empty() || actual.empty()) {
+        score += 1;
+      } else {
+        bool typeAllowed = false;
+        for (const auto &allowed : allowedTypes) {
+          if (actual == allowed) {
+            typeAllowed = true;
+            score += 10;
+            break;
+          } else if (actual == "_IntType" && allowed == "_RealType") {
+            typeAllowed = true;
+            score += 5;
+            break;
+          }
+        }
+        if (!typeAllowed)
+          return -1;
+      }
+    }
+    return score;
+  };
+
+  // First pass: score platformModule declarations and choose the best match
+  int bestScore = -1;
+  for (const auto &decl : decls) {
+    if (decl && decl->getEntityType() == "platformModule") {
+      int s = scoreCandidate(decl);
+      if (s > bestScore) {
+        bestScore = s;
         funcDecl = decl;
-        break;
+      }
+    }
+  }
+
+  // Fallback pass for platformModules if none had positive score
+  if (!funcDecl && actualTypes.empty()) {
+    for (const auto &decl : decls) {
+      if (decl && decl->getEntityType() == "platformModule") {
+        auto inputs = decl->getPropertyValue("inputs");
+        bool matches = true;
+        if (inputs) {
+          if (!hasStreamInput)
+            continue;
+          if (inputs->getNodeType() != AST::List)
+            matches = false;
+        }
+        if (matches) {
+          funcDecl = decl;
+          break;
+        }
       }
     }
   }

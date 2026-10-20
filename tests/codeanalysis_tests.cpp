@@ -26,6 +26,12 @@
 
 #include "stride/codegen/codeanalysis.hpp"
 #include "stride/codegen/coderesolver.hpp"
+#include "stride/parser/declarationnode.h"
+#include "stride/parser/entitynode.h"
+#include "stride/parser/functionnode.h"
+#include "stride/parser/listnode.h"
+#include "stride/parser/propertynode.h"
+#include "stride/parser/valuenode.h"
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
 
@@ -470,3 +476,164 @@ TEST(CodeAnalysis, StateStructInformationForDeclaration) {
   ASSERT_EQ(typeTree.nodes[0].internal.size(), 1);
   EXPECT_EQ(ASTQuery::getNodeName(typeTree.nodes[0].internal[0].first), "NestedModInternal");
 }
+
+TEST(CodeAnalysis, MatchDefinitionToTypesOverloadResolution) {
+  auto makePlatformModule = [](const std::string &name,
+                               const std::vector<std::string> &inputTypes) {
+    auto decl = std::make_shared<DeclarationNode>(name, "platformModule", nullptr,
+                                                  __FILE__, __LINE__);
+    auto inputsList = std::make_shared<ListNode>(__FILE__, __LINE__);
+    for (const auto &t : inputTypes) {
+      inputsList->addChild(
+          std::make_shared<EntityNode>(t, __FILE__, __LINE__));
+    }
+    decl->addProperty(std::make_shared<PropertyNode>("inputs", inputsList,
+                                                     __FILE__, __LINE__));
+    return decl;
+  };
+
+  // Equal candidates: Equal@String_Bool is placed FIRST to verify ordering independence
+  auto equalString =
+      makePlatformModule("Equal@String_Bool", {"_StringType", "_StringType"});
+  auto equalDouble =
+      makePlatformModule("Equal@Double_Bool", {"_RealType", "_RealType"});
+  auto equalInt =
+      makePlatformModule("Equal@Int_Bool", {"_IntType", "_IntType"});
+
+  std::vector<std::shared_ptr<DeclarationNode>> candidates = {equalString,
+                                                              equalDouble,
+                                                              equalInt};
+
+  // 1. Real + Real inputs -> matches Equal@Double_Bool
+  {
+    auto func =
+        std::make_shared<FunctionNode>("Equal", nullptr, __FILE__, __LINE__);
+    auto inputList = std::make_shared<ListNode>(__FILE__, __LINE__);
+    inputList->addChild(std::make_shared<ValueNode>(1.5, __FILE__, __LINE__));
+    inputList->addChild(std::make_shared<ValueNode>(2.5, __FILE__, __LINE__));
+    func->setCompilerProperty("mainInput", inputList);
+
+    auto matched = CodeAnalysis::matchDefinitionToTypes(candidates, func);
+    ASSERT_TRUE(matched != nullptr);
+    EXPECT_EQ(matched->getName(), "Equal@Double_Bool");
+  }
+
+  // 2. Real + Int inputs with Int marked with "typecast" = "_RealType" -> matches Equal@Double_Bool
+  {
+    auto func =
+        std::make_shared<FunctionNode>("Equal", nullptr, __FILE__, __LINE__);
+    auto inputList = std::make_shared<ListNode>(__FILE__, __LINE__);
+    inputList->addChild(std::make_shared<ValueNode>(1.5, __FILE__, __LINE__));
+    auto intElem = std::make_shared<ValueNode>(int64_t(0), __FILE__, __LINE__);
+    intElem->setCompilerProperty(
+        "typecast",
+        std::make_shared<ValueNode>("_RealType", __FILE__, __LINE__));
+    inputList->addChild(intElem);
+    func->setCompilerProperty("mainInput", inputList);
+
+    auto matched = CodeAnalysis::matchDefinitionToTypes(candidates, func);
+    ASSERT_TRUE(matched != nullptr);
+    EXPECT_EQ(matched->getName(), "Equal@Double_Bool");
+  }
+
+  // 3. Real + Int inputs without explicit typecast (int-to-real promotion) -> matches Equal@Double_Bool
+  {
+    auto func =
+        std::make_shared<FunctionNode>("Equal", nullptr, __FILE__, __LINE__);
+    auto inputList = std::make_shared<ListNode>(__FILE__, __LINE__);
+    inputList->addChild(std::make_shared<ValueNode>(1.5, __FILE__, __LINE__));
+    inputList->addChild(
+        std::make_shared<ValueNode>(int64_t(0), __FILE__, __LINE__));
+    func->setCompilerProperty("mainInput", inputList);
+
+    auto matched = CodeAnalysis::matchDefinitionToTypes(candidates, func);
+    ASSERT_TRUE(matched != nullptr);
+    EXPECT_EQ(matched->getName(), "Equal@Double_Bool");
+  }
+
+  // 4. Int + Int inputs -> matches Equal@Int_Bool
+  {
+    auto func =
+        std::make_shared<FunctionNode>("Equal", nullptr, __FILE__, __LINE__);
+    auto inputList = std::make_shared<ListNode>(__FILE__, __LINE__);
+    inputList->addChild(
+        std::make_shared<ValueNode>(int64_t(10), __FILE__, __LINE__));
+    inputList->addChild(
+        std::make_shared<ValueNode>(int64_t(20), __FILE__, __LINE__));
+    func->setCompilerProperty("mainInput", inputList);
+
+    auto matched = CodeAnalysis::matchDefinitionToTypes(candidates, func);
+    ASSERT_TRUE(matched != nullptr);
+    EXPECT_EQ(matched->getName(), "Equal@Int_Bool");
+  }
+
+  // 5. String + String inputs -> matches Equal@String_Bool
+  {
+    auto func =
+        std::make_shared<FunctionNode>("Equal", nullptr, __FILE__, __LINE__);
+    auto inputList = std::make_shared<ListNode>(__FILE__, __LINE__);
+    inputList->addChild(
+        std::make_shared<ValueNode>(std::string("hello"), __FILE__, __LINE__));
+    inputList->addChild(
+        std::make_shared<ValueNode>(std::string("world"), __FILE__, __LINE__));
+    func->setCompilerProperty("mainInput", inputList);
+
+    auto matched = CodeAnalysis::matchDefinitionToTypes(candidates, func);
+    ASSERT_TRUE(matched != nullptr);
+    EXPECT_EQ(matched->getName(), "Equal@String_Bool");
+  }
+
+  // 6. Single input overload: Overload@Double vs Overload@Int
+  {
+    auto overloadDouble =
+        makePlatformModule("Overload@Double", {"_RealType"});
+    auto overloadInt = makePlatformModule("Overload@Int", {"_IntType"});
+    std::vector<std::shared_ptr<DeclarationNode>> unaryCandidates = {
+        overloadDouble, overloadInt};
+
+    auto funcInt =
+        std::make_shared<FunctionNode>("Overload", nullptr, __FILE__, __LINE__);
+    funcInt->setCompilerProperty(
+        "mainInput",
+        std::make_shared<ValueNode>(int64_t(42), __FILE__, __LINE__));
+    auto matchedInt =
+        CodeAnalysis::matchDefinitionToTypes(unaryCandidates, funcInt);
+    ASSERT_TRUE(matchedInt != nullptr);
+    EXPECT_EQ(matchedInt->getName(), "Overload@Int");
+
+    auto funcReal =
+        std::make_shared<FunctionNode>("Overload", nullptr, __FILE__, __LINE__);
+    funcReal->setCompilerProperty(
+        "mainInput", std::make_shared<ValueNode>(3.14, __FILE__, __LINE__));
+    auto matchedReal =
+        CodeAnalysis::matchDefinitionToTypes(unaryCandidates, funcReal);
+    ASSERT_TRUE(matchedReal != nullptr);
+    EXPECT_EQ(matchedReal->getName(), "Overload@Double");
+  }
+
+  // 7. Input entity resolved via resolveConnectionEntity when input has connected signal entity
+  {
+    auto signalDecl = std::make_shared<DeclarationNode>(
+        "MyRealSignal", "signal", nullptr, __FILE__, __LINE__);
+    signalDecl->addProperty(std::make_shared<PropertyNode>(
+        "type", std::make_shared<EntityNode>("_RealType", __FILE__, __LINE__),
+        __FILE__, __LINE__));
+
+    auto entityNode =
+        std::make_shared<EntityNode>("MyRealSignal", __FILE__, __LINE__);
+    entityNode->setCompilerProperty("declaration", signalDecl);
+
+    auto func =
+        std::make_shared<FunctionNode>("Equal", nullptr, __FILE__, __LINE__);
+    auto inputList = std::make_shared<ListNode>(__FILE__, __LINE__);
+    inputList->addChild(entityNode);
+    inputList->addChild(std::make_shared<ValueNode>(1.0, __FILE__, __LINE__));
+    func->setCompilerProperty("mainInput", inputList);
+
+    auto matched = CodeAnalysis::matchDefinitionToTypes(candidates, func);
+    ASSERT_TRUE(matched != nullptr);
+    EXPECT_EQ(matched->getName(), "Equal@Double_Bool");
+  }
+}
+
+
