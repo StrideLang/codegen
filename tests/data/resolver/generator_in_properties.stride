@@ -1,0 +1,17 @@
+module Func {
+}
+
+constant RangeConst {
+    value: [0..8]
+}
+
+module ModRange {
+    range: [0..8]
+    listRange: [0..8]
+}
+
+signal TestSig[9] {
+    default: [0..8]
+}
+
+Func(range: [0..8]);

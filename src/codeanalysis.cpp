@@ -24,6 +24,7 @@
 
 #include "stride/codegen/codeanalysis.hpp"
 
+#include "stride/parser/generatorrangenode.h"
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
 
@@ -1415,6 +1416,28 @@ int CodeAnalysis::getNodeNumOutputs(ASTNode node, const ScopeStack &scope,
              node->getNodeType() == AST::ArrayDeclaration) {
     return ASTQuery::getEntityDeclaredSize(
         std::static_pointer_cast<DeclarationNode>(node), scope, tree, errors);
+  } else if (node->getNodeType() == AST::GeneratorRange) {
+    auto genRange = std::static_pointer_cast<GeneratorRangeNode>(node);
+    std::vector<LangError> evalErrors;
+    int64_t start = ASTFunctions::evaluateConstInteger(
+        genRange->startIndex(), scope, tree, &evalErrors);
+    int64_t end = ASTFunctions::evaluateConstInteger(
+        genRange->endIndex(), scope, tree, &evalErrors);
+    int64_t step = 1;
+    if (genRange->stepIndex()) {
+      step = ASTFunctions::evaluateConstInteger(
+          genRange->stepIndex(), scope, tree, &evalErrors);
+    }
+    if (evalErrors.empty() && step != 0) {
+      if (step > 0 && end >= start) {
+        return (int)((end - start) / step + 1);
+      } else if (step < 0 && end <= start) {
+        return (int)((start - end) / (-step) + 1);
+      } else {
+        return 0;
+      }
+    }
+    return CodeAnalysis::SIZE_UNKNOWN;
   }
   return CodeAnalysis::SIZE_UNKNOWN;
 }

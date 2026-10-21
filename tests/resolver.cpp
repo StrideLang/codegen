@@ -25,6 +25,11 @@
 #include "gtest/gtest.h"
 
 #include "stride/codegen/coderesolver.hpp"
+#include "stride/parser/functionnode.h"
+#include "stride/parser/generatorrangenode.h"
+#include "stride/parser/listnode.h"
+#include "stride/parser/streamnode.h"
+#include "stride/parser/valuenode.h"
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
 // #include "stride/codegen/stridelibrary.hpp"
@@ -333,4 +338,155 @@ TEST(Resolver, SynthesizeBundleDeclarationMemberNested) {
   // EXPECT_EQ(elementValue->getNodeType(), AST::Int);
   // EXPECT_EQ(std::static_pointer_cast<ValueNode>(elementValue)->getIntValue(),
   //           3);
+}
+
+TEST(Resolver, GeneratorRangeExpansionInStreams) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+
+  // Bare generator 0..8 >> Target should not be allowed
+  {
+    std::string invalidCode = "signal Target[9] {}\n0..8 >> Target;\n";
+    std::string invalidFile = writeCodeToFile(invalidCode);
+    ASTNode invalidTree = AST::parseFile(invalidFile.c_str());
+    EXPECT_EQ(invalidTree, nullptr);
+  }
+
+  std::string code = R"(
+signal Target1[9] {}
+[0..8] >> Target1;
+
+signal Target2[5] {}
+[0..4] >> Target2;
+
+signal Target3[4] {}
+[1, 2..3, 10] >> Target3;
+)";
+  std::string file = writeCodeToFile(code);
+  ASTNode tree = AST::parseFile(file.c_str());
+  ASSERT_NE(tree, nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  std::vector<std::shared_ptr<StreamNode>> streams;
+  for (const auto &child : tree->getChildren()) {
+    if (child->getNodeType() == AST::Stream) {
+      streams.push_back(std::static_pointer_cast<StreamNode>(child));
+    }
+  }
+  ASSERT_GE(streams.size(), 3);
+
+  // Stream 0: [0..8] >> Target1;
+  // CodeResolver expands [0..8] into a ListNode of 9 ValueNodes [0..8]
+  auto left0 = streams[0]->getLeft();
+  ASSERT_NE(left0, nullptr);
+  ASSERT_EQ(left0->getNodeType(), AST::List);
+  auto list0 = std::static_pointer_cast<ListNode>(left0);
+  ASSERT_EQ(list0->getChildren().size(), 9);
+  for (int64_t i = 0; i <= 8; ++i) {
+    ASSERT_EQ(list0->getChildren().at(i)->getNodeType(), AST::Int);
+    EXPECT_EQ(std::static_pointer_cast<ValueNode>(list0->getChildren().at(i))->getIntValue(), i);
+  }
+
+  // Stream 1: [0..4] >> Target2;
+  auto left1 = streams[1]->getLeft();
+  ASSERT_NE(left1, nullptr);
+  ASSERT_EQ(left1->getNodeType(), AST::List);
+  auto list1 = std::static_pointer_cast<ListNode>(left1);
+  ASSERT_EQ(list1->getChildren().size(), 5);
+  for (int64_t i = 0; i <= 4; ++i) {
+    ASSERT_EQ(list1->getChildren().at(i)->getNodeType(), AST::Int);
+    EXPECT_EQ(std::static_pointer_cast<ValueNode>(list1->getChildren().at(i))->getIntValue(), i);
+  }
+
+  // Stream 2: [1, 2..3, 10] >> Target3;
+  // Flattens into [1, 2, 3, 10]
+  auto left2 = streams[2]->getLeft();
+  ASSERT_NE(left2, nullptr);
+  ASSERT_EQ(left2->getNodeType(), AST::List);
+  auto list2 = std::static_pointer_cast<ListNode>(left2);
+  ASSERT_EQ(list2->getChildren().size(), 4);
+  EXPECT_EQ(std::static_pointer_cast<ValueNode>(list2->getChildren().at(0))->getIntValue(), 1);
+  EXPECT_EQ(std::static_pointer_cast<ValueNode>(list2->getChildren().at(1))->getIntValue(), 2);
+  EXPECT_EQ(std::static_pointer_cast<ValueNode>(list2->getChildren().at(2))->getIntValue(), 3);
+  EXPECT_EQ(std::static_pointer_cast<ValueNode>(list2->getChildren().at(3))->getIntValue(), 10);
+}
+
+TEST(Resolver, GeneratorRangeInProperties) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree =
+      AST::parseFile(TESTS_SOURCE_DIR "resolver/generator_in_properties.stride");
+  ASSERT_NE(tree, nullptr);
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  auto constDecl = ASTQuery::findDeclarationByName("RangeConst", ScopeStack(), tree);
+  ASSERT_NE(constDecl, nullptr);
+  auto constVal = constDecl->getPropertyValue("value");
+  ASSERT_NE(constVal, nullptr);
+  ASSERT_EQ(constVal->getNodeType(), AST::List);
+  auto constList = std::static_pointer_cast<ListNode>(constVal);
+  ASSERT_EQ(constList->getChildren().size(), 1);
+  ASSERT_EQ(constList->getChildren().at(0)->getNodeType(), AST::GeneratorRange);
+  auto constGen = std::static_pointer_cast<GeneratorRangeNode>(constList->getChildren().at(0));
+  EXPECT_EQ(std::static_pointer_cast<ValueNode>(constGen->startIndex())->getIntValue(), 0);
+  EXPECT_EQ(std::static_pointer_cast<ValueNode>(constGen->endIndex())->getIntValue(), 8);
+
+  auto modDecl = ASTQuery::findDeclarationByName("ModRange", ScopeStack(), tree);
+  ASSERT_NE(modDecl, nullptr);
+  auto modRange = modDecl->getPropertyValue("range");
+  ASSERT_NE(modRange, nullptr);
+  ASSERT_EQ(modRange->getNodeType(), AST::List);
+  auto modList = std::static_pointer_cast<ListNode>(modRange);
+  ASSERT_EQ(modList->getChildren().size(), 1);
+  ASSERT_EQ(modList->getChildren().at(0)->getNodeType(), AST::GeneratorRange);
+  auto modGen = std::static_pointer_cast<GeneratorRangeNode>(modList->getChildren().at(0));
+  EXPECT_EQ(std::static_pointer_cast<ValueNode>(modGen->startIndex())->getIntValue(), 0);
+  EXPECT_EQ(std::static_pointer_cast<ValueNode>(modGen->endIndex())->getIntValue(), 8);
+
+  auto modRangeList = modDecl->getPropertyValue("listRange");
+  ASSERT_NE(modRangeList, nullptr);
+  ASSERT_EQ(modRangeList->getNodeType(), AST::List);
+  auto modListRange = std::static_pointer_cast<ListNode>(modRangeList);
+  ASSERT_EQ(modListRange->getChildren().size(), 1);
+  ASSERT_EQ(modListRange->getChildren().at(0)->getNodeType(), AST::GeneratorRange);
+
+  auto sigDecl = ASTQuery::findDeclarationByName("TestSig", ScopeStack(), tree);
+  ASSERT_NE(sigDecl, nullptr);
+  auto sigDefault = sigDecl->getPropertyValue("default");
+  ASSERT_NE(sigDefault, nullptr);
+  ASSERT_EQ(sigDefault->getNodeType(), AST::List);
+  auto sigList = std::static_pointer_cast<ListNode>(sigDefault);
+  ASSERT_EQ(sigList->getChildren().size(), 1);
+  ASSERT_EQ(sigList->getChildren().at(0)->getNodeType(), AST::GeneratorRange);
+
+  bool foundFunc = false;
+  for (const auto &child : tree->getChildren()) {
+    if (child->getNodeType() == AST::Stream) {
+      auto stream = std::static_pointer_cast<StreamNode>(child);
+      auto checkFunc = [&](ASTNode node) {
+        if (node && node->getNodeType() == AST::Function) {
+          auto func = std::static_pointer_cast<FunctionNode>(node);
+          if (func->getName() == "Func") {
+            foundFunc = true;
+            auto rangeProp = func->getPropertyValue("range");
+            ASSERT_NE(rangeProp, nullptr);
+            ASSERT_EQ(rangeProp->getNodeType(), AST::List);
+            auto funcList = std::static_pointer_cast<ListNode>(rangeProp);
+            ASSERT_EQ(funcList->getChildren().size(), 1);
+            ASSERT_EQ(funcList->getChildren().at(0)->getNodeType(), AST::GeneratorRange);
+            auto gen = std::static_pointer_cast<GeneratorRangeNode>(funcList->getChildren().at(0));
+            EXPECT_EQ(std::static_pointer_cast<ValueNode>(gen->startIndex())->getIntValue(), 0);
+            EXPECT_EQ(std::static_pointer_cast<ValueNode>(gen->endIndex())->getIntValue(), 8);
+          }
+        }
+      };
+      checkFunc(stream->getLeft());
+      checkFunc(stream->getRight());
+    }
+  }
+  EXPECT_TRUE(foundFunc);
 }

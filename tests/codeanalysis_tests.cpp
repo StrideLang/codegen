@@ -29,6 +29,7 @@
 #include "stride/parser/declarationnode.h"
 #include "stride/parser/entitynode.h"
 #include "stride/parser/functionnode.h"
+#include "stride/parser/generatorrangenode.h"
 #include "stride/parser/listnode.h"
 #include "stride/parser/propertynode.h"
 #include "stride/parser/valuenode.h"
@@ -634,6 +635,30 @@ TEST(CodeAnalysis, MatchDefinitionToTypesOverloadResolution) {
     ASSERT_TRUE(matched != nullptr);
     EXPECT_EQ(matched->getName(), "Equal@Double_Bool");
   }
+}
+
+TEST(CodeAnalysis, GeneratorRangeDataType) {
+  // Direct GeneratorRangeNode
+  auto start = std::make_shared<ValueNode>(int64_t(0), __FILE__, __LINE__);
+  auto end = std::make_shared<ValueNode>(int64_t(8), __FILE__, __LINE__);
+  auto genNode = std::make_shared<GeneratorRangeNode>(start, end, __FILE__, __LINE__);
+  EXPECT_EQ(CodeAnalysis::resolveNodeOutDataType(genNode, ScopeStack(), nullptr), "_IntType");
+
+  // Stepped GeneratorRangeNode
+  auto step = std::make_shared<ValueNode>(int64_t(2), __FILE__, __LINE__);
+  auto genStepped = std::make_shared<GeneratorRangeNode>(start, step, end, __FILE__, __LINE__);
+  EXPECT_EQ(CodeAnalysis::resolveNodeOutDataType(genStepped, ScopeStack(), nullptr), "_IntType");
+
+  // ListNode containing GeneratorRangeNode
+  auto listNode = std::make_shared<ListNode>(__FILE__, __LINE__);
+  listNode->addChild(genNode);
+  EXPECT_EQ(CodeAnalysis::resolveNodeOutDataType(listNode, ScopeStack(), nullptr), "_IntType");
+
+  // ListNode containing mixed int and GeneratorRangeNode
+  auto mixedList = std::make_shared<ListNode>(__FILE__, __LINE__);
+  mixedList->addChild(std::make_shared<ValueNode>(int64_t(1), __FILE__, __LINE__));
+  mixedList->addChild(genNode);
+  EXPECT_EQ(CodeAnalysis::resolveNodeOutDataType(mixedList, ScopeStack(), nullptr), "_IntType");
 }
 
 
