@@ -4274,15 +4274,15 @@ void CodeResolver::resolveTypeCastForStream(std::shared_ptr<StreamNode> stream,
       next = std::static_pointer_cast<StreamNode>(next)->getLeft();
     }
     // TODO more detailed resolution with specific float and int types
-    bool isMultiArgFunctionCall = false;
+    bool isVariadicFunctionCall = false;
     if (left->getNodeType() == AST::List && next &&
         next->getNodeType() == AST::Function) {
       int numIn = CodeAnalysis::getNodeNumInputs(next, scopeStack, tree);
-      if (numIn > 1 || numIn == CodeAnalysis::SIZE_MEMBER_ACCESS) {
-        isMultiArgFunctionCall = true;
+      if (numIn == CodeAnalysis::SIZE_MEMBER_ACCESS) {
+        isVariadicFunctionCall = true;
       }
     }
-    if ((left->getNodeType() == AST::List && !isMultiArgFunctionCall) ||
+    if ((left->getNodeType() == AST::List && !isVariadicFunctionCall) ||
         left->getNodeType() == AST::Expression) {
       std::vector<std::string> types;
       std::string resolvedType;
