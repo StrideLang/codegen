@@ -2248,6 +2248,8 @@ std::string CodeAnalysis::resolveNodeOutDataTypeInternal(
   } else if (node->getNodeType() == AST::Range) {
     return resolveRangeDataType(static_cast<RangeNode *>(node.get()),
                                 scopeStack, tree);
+  } else if (node->getNodeType() == AST::GeneratorRange) {
+    return "_IntType";
   } else if (node->getNodeType() == AST::MemberAccess) {
     return resolveMemberAccessDataType(
         static_cast<MemberAccessNode *>(node.get()), scopeStack, tree);

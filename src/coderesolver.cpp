@@ -28,6 +28,10 @@
 // #include "stride/codegen/stridesystem.hpp"
 #include "stride/codegen/coderesolver.hpp"
 
+#include "stride/parser/arraynode.h"
+#include "stride/parser/generatorrangenode.h"
+#include "stride/parser/rangenode.h"
+#include "stride/parser/valuenode.h"
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
 
@@ -794,52 +798,143 @@ static ASTNode expandRangesInASTNode(ASTNode node, const ScopeStack &scope,
   if (!node)
     return nullptr;
 
+  if (node->getNodeType() == AST::GeneratorRange) {
+    auto genRange = std::static_pointer_cast<GeneratorRangeNode>(node);
+    int64_t start = ASTFunctions::evaluateConstInteger(
+        genRange->startIndex(), scope, tree, nullptr);
+    int64_t end = ASTFunctions::evaluateConstInteger(
+        genRange->endIndex(), scope, tree, nullptr);
+    int64_t step = 1;
+    if (genRange->stepIndex()) {
+      step = ASTFunctions::evaluateConstInteger(
+          genRange->stepIndex(), scope, tree, nullptr);
+    }
+    auto expandedList = std::make_shared<ListNode>(
+        nullptr, node->getFilename().c_str(), node->getLine());
+    if (step > 0 && end >= start) {
+      for (int64_t i = start; i <= end; i += step) {
+        expandedList->addChild(std::make_shared<ValueNode>(
+            i, node->getFilename().c_str(), node->getLine()));
+      }
+    } else if (step < 0 && end <= start) {
+      for (int64_t i = start; i >= end; i += step) {
+        expandedList->addChild(std::make_shared<ValueNode>(
+            i, node->getFilename().c_str(), node->getLine()));
+      }
+    }
+    return expandedList;
+  }
+
   if (node->getNodeType() == AST::Array) {
     auto arrayNode = std::static_pointer_cast<ArrayNode>(node);
     auto indexList = arrayNode->index();
-    if (indexList && !indexList->getChildren().empty()) {
-      bool hasRange = false;
-      for (const auto &idx : indexList->getChildren()) {
-        if (idx->getNodeType() == AST::Range) {
-          hasRange = true;
-          break;
+    if (!indexList || indexList->getChildren().empty()) {
+      return node;
+    }
+
+    auto resolveArrayElement =
+        [&](const std::string &arrayName, ASTNode idxNode,
+            const std::vector<std::string> &ns) -> ASTNode {
+      std::vector<LangError> evalErrors;
+      int64_t evaluatedIdx =
+          ASTFunctions::evaluateConstInteger(idxNode, scope, tree, &evalErrors);
+      if (evalErrors.empty()) {
+        if (evaluatedIdx < 0) {
+          auto decl =
+              ASTQuery::findDeclarationByName(arrayName, scope, tree, ns);
+          if (decl) {
+            std::string entityType = decl->getEntityType();
+            if (entityType == "switch" ||
+                CodeAnalysis::getDataTypeForDeclaration(decl, scope, tree) ==
+                    "_SwitchType") {
+              return std::make_shared<ValueNode>(
+                  false, node->getFilename().c_str(), node->getLine());
+            } else {
+              return std::make_shared<ValueNode>(
+                  (int64_t)0, node->getFilename().c_str(), node->getLine());
+            }
+          }
+          return std::make_shared<ValueNode>(
+              false, node->getFilename().c_str(), node->getLine());
+        } else {
+          auto singleIdxList = std::make_shared<ListNode>(
+              std::make_shared<ValueNode>(evaluatedIdx,
+                                          node->getFilename().c_str(),
+                                          node->getLine()),
+              node->getFilename().c_str(), node->getLine());
+          return std::make_shared<ArrayNode>(
+              arrayName, singleIdxList, node->getFilename().c_str(),
+              node->getLine(), ns);
         }
       }
-      if (hasRange) {
-        auto expandedList = std::make_shared<ListNode>(
-            nullptr, node->getFilename().c_str(), node->getLine());
-        for (const auto &idx : indexList->getChildren()) {
-          if (idx->getNodeType() == AST::Range) {
-            auto range = std::static_pointer_cast<RangeNode>(idx);
-            int64_t start = ASTFunctions::evaluateConstInteger(
-                range->startIndex(), scope, tree, nullptr);
-            int64_t end = ASTFunctions::evaluateConstInteger(
-                range->endIndex(), scope, tree, nullptr);
-            if (end >= start) {
-              for (int i = start; i <= end; ++i) {
-                auto singleIdxList = std::make_shared<ListNode>(
-                    std::make_shared<ValueNode>((int64_t)i,
-                                                node->getFilename().c_str(),
-                                                node->getLine()),
-                    node->getFilename().c_str(), node->getLine());
-                auto singleElem = std::make_shared<ArrayNode>(
-                    arrayNode->getName(), singleIdxList,
-                    node->getFilename().c_str(), node->getLine());
-                expandedList->addChild(singleElem);
-              }
-            }
-          } else {
-            auto singleIdxList = std::make_shared<ListNode>(
-                idx->deepCopy(), node->getFilename().c_str(), node->getLine());
-            auto singleElem = std::make_shared<ArrayNode>(
-                arrayNode->getName(), singleIdxList,
-                node->getFilename().c_str(), node->getLine());
-            expandedList->addChild(singleElem);
+      auto singleIdxList = std::make_shared<ListNode>(
+          idxNode->deepCopy(), node->getFilename().c_str(), node->getLine());
+      return std::make_shared<ArrayNode>(
+          arrayName, singleIdxList, node->getFilename().c_str(),
+          node->getLine(), ns);
+    };
+
+    bool hasCollection = false;
+    std::vector<ASTNode> expandedIndexItems;
+    for (const auto &idx : indexList->getChildren()) {
+      if (idx->getNodeType() == AST::Range) {
+        hasCollection = true;
+        auto range = std::static_pointer_cast<RangeNode>(idx);
+        int64_t start = ASTFunctions::evaluateConstInteger(
+            range->startIndex(), scope, tree, nullptr);
+        int64_t end = ASTFunctions::evaluateConstInteger(
+            range->endIndex(), scope, tree, nullptr);
+        if (end >= start) {
+          for (int64_t i = start; i <= end; ++i) {
+            expandedIndexItems.push_back(std::make_shared<ValueNode>(
+                i, node->getFilename().c_str(), node->getLine()));
           }
         }
-        return expandedList;
+      } else {
+        auto expIdx = expandRangesInASTNode(idx, scope, tree);
+        if (expIdx && expIdx->getNodeType() == AST::List) {
+          hasCollection = true;
+          for (const auto &sub : expIdx->getChildren()) {
+            expandedIndexItems.push_back(sub);
+          }
+        } else {
+          expandedIndexItems.push_back(expIdx ? expIdx : idx);
+        }
       }
     }
+
+    if (hasCollection) {
+      auto expandedList = std::make_shared<ListNode>(
+          nullptr, node->getFilename().c_str(), node->getLine());
+      for (const auto &idxItem : expandedIndexItems) {
+        expandedList->addChild(resolveArrayElement(
+            arrayNode->getName(), idxItem, arrayNode->getNamespaceList()));
+      }
+      return expandedList;
+    } else if (expandedIndexItems.size() == 1) {
+      std::vector<LangError> evalErrors;
+      int64_t evaluatedIdx = ASTFunctions::evaluateConstInteger(
+          expandedIndexItems[0], scope, tree, &evalErrors);
+      if (evalErrors.empty() && evaluatedIdx < 0) {
+        auto decl = ASTQuery::findDeclarationByName(
+            arrayNode->getName(), scope, tree, arrayNode->getNamespaceList());
+        if (decl) {
+          std::string entityType = decl->getEntityType();
+          if (entityType == "switch" ||
+              CodeAnalysis::getDataTypeForDeclaration(decl, scope, tree) ==
+                  "_SwitchType") {
+            return std::make_shared<ValueNode>(
+                false, node->getFilename().c_str(), node->getLine());
+          } else {
+            return std::make_shared<ValueNode>(
+                (int64_t)0, node->getFilename().c_str(), node->getLine());
+          }
+        }
+        return std::make_shared<ValueNode>(
+            false, node->getFilename().c_str(), node->getLine());
+      }
+    }
+
     return node;
   }
 
@@ -849,7 +944,14 @@ static ASTNode expandRangesInASTNode(ASTNode node, const ScopeStack &scope,
         nullptr, node->getFilename().c_str(), node->getLine());
     for (const auto &child : listNode->getChildren()) {
       auto expChild = expandRangesInASTNode(child, scope, tree);
-      newList->addChild(expChild);
+      if (child->getNodeType() == AST::GeneratorRange && expChild &&
+          expChild->getNodeType() == AST::List) {
+        for (const auto &item : expChild->getChildren()) {
+          newList->addChild(item);
+        }
+      } else {
+        newList->addChild(expChild);
+      }
     }
     return newList;
   }
@@ -900,6 +1002,31 @@ expandSingleIndexedStream(std::shared_ptr<StreamNode> stream,
     multiInstProp = funcNode->getCompilerProperty("_arrayIndices");
   }
   if (!multiInstProp) {
+    if (left && left->getNodeType() == AST::List) {
+      auto inList = std::static_pointer_cast<ListNode>(left);
+      bool hasNestedList = false;
+      for (const auto &c : inList->getChildren()) {
+        if (c && c->getNodeType() == AST::List) {
+          hasNestedList = true;
+          break;
+        }
+      }
+      if (hasNestedList) {
+        auto flatList = std::make_shared<ListNode>(
+            nullptr, inList->getFilename().c_str(), inList->getLine());
+        std::function<void(ASTNode)> flatten = [&](ASTNode item) {
+          if (item && item->getNodeType() == AST::List) {
+            for (const auto &child : item->getChildren()) {
+              flatten(child);
+            }
+          } else if (item) {
+            flatList->addChild(item);
+          }
+        };
+        flatten(inList);
+        left = flatList;
+      }
+    }
     stream->setLeft(left);
     if (outNode) {
       auto subStream = std::static_pointer_cast<StreamNode>(right);
