@@ -800,14 +800,14 @@ static ASTNode expandRangesInASTNode(ASTNode node, const ScopeStack &scope,
 
   if (node->getNodeType() == AST::GeneratorRange) {
     auto genRange = std::static_pointer_cast<GeneratorRangeNode>(node);
-    int64_t start = ASTFunctions::evaluateConstInteger(
-        genRange->startIndex(), scope, tree, nullptr);
-    int64_t end = ASTFunctions::evaluateConstInteger(
-        genRange->endIndex(), scope, tree, nullptr);
+    int64_t start = ASTFunctions::evaluateConstInteger(genRange->startIndex(),
+                                                       scope, tree, nullptr);
+    int64_t end = ASTFunctions::evaluateConstInteger(genRange->endIndex(),
+                                                     scope, tree, nullptr);
     int64_t step = 1;
     if (genRange->stepIndex()) {
-      step = ASTFunctions::evaluateConstInteger(
-          genRange->stepIndex(), scope, tree, nullptr);
+      step = ASTFunctions::evaluateConstInteger(genRange->stepIndex(), scope,
+                                                tree, nullptr);
     }
     auto expandedList = std::make_shared<ListNode>(
         nullptr, node->getFilename().c_str(), node->getLine());
@@ -854,24 +854,23 @@ static ASTNode expandRangesInASTNode(ASTNode node, const ScopeStack &scope,
                   (int64_t)0, node->getFilename().c_str(), node->getLine());
             }
           }
-          return std::make_shared<ValueNode>(
-              false, node->getFilename().c_str(), node->getLine());
+          return std::make_shared<ValueNode>(false, node->getFilename().c_str(),
+                                             node->getLine());
         } else {
           auto singleIdxList = std::make_shared<ListNode>(
-              std::make_shared<ValueNode>(evaluatedIdx,
-                                          node->getFilename().c_str(),
-                                          node->getLine()),
+              std::make_shared<ValueNode>(
+                  evaluatedIdx, node->getFilename().c_str(), node->getLine()),
               node->getFilename().c_str(), node->getLine());
-          return std::make_shared<ArrayNode>(
-              arrayName, singleIdxList, node->getFilename().c_str(),
-              node->getLine(), ns);
+          return std::make_shared<ArrayNode>(arrayName, singleIdxList,
+                                             node->getFilename().c_str(),
+                                             node->getLine(), ns);
         }
       }
       auto singleIdxList = std::make_shared<ListNode>(
           idxNode->deepCopy(), node->getFilename().c_str(), node->getLine());
-      return std::make_shared<ArrayNode>(
-          arrayName, singleIdxList, node->getFilename().c_str(),
-          node->getLine(), ns);
+      return std::make_shared<ArrayNode>(arrayName, singleIdxList,
+                                         node->getFilename().c_str(),
+                                         node->getLine(), ns);
     };
 
     bool hasCollection = false;
@@ -882,8 +881,8 @@ static ASTNode expandRangesInASTNode(ASTNode node, const ScopeStack &scope,
         auto range = std::static_pointer_cast<RangeNode>(idx);
         int64_t start = ASTFunctions::evaluateConstInteger(
             range->startIndex(), scope, tree, nullptr);
-        int64_t end = ASTFunctions::evaluateConstInteger(
-            range->endIndex(), scope, tree, nullptr);
+        int64_t end = ASTFunctions::evaluateConstInteger(range->endIndex(),
+                                                         scope, tree, nullptr);
         if (end >= start) {
           for (int64_t i = start; i <= end; ++i) {
             expandedIndexItems.push_back(std::make_shared<ValueNode>(
@@ -930,8 +929,8 @@ static ASTNode expandRangesInASTNode(ASTNode node, const ScopeStack &scope,
                 (int64_t)0, node->getFilename().c_str(), node->getLine());
           }
         }
-        return std::make_shared<ValueNode>(
-            false, node->getFilename().c_str(), node->getLine());
+        return std::make_shared<ValueNode>(false, node->getFilename().c_str(),
+                                           node->getLine());
       }
     }
 
@@ -1910,9 +1909,8 @@ void CodeResolver::resolveDomainsForStream(std::shared_ptr<StreamNode> stream,
       // -- Process domains for connected ports
       ASTNode samplingDomainName;
       for (const auto &property : func->getProperties()) {
-        samplingDomainName = processDomainsForNode(
-            std::static_pointer_cast<StreamNode>(property->getValue()),
-            scopeStack, domainStack);
+        samplingDomainName = processDomainsForNode(property->getValue(),
+                                                   scopeStack, domainStack);
       }
     }
 
