@@ -895,13 +895,13 @@ StrideSystem::getFrameworkDataType(std::string frameworkName,
   return nullptr;
 }
 
-std::string StrideSystem::getFrameworkDefaultDataType(std::string frameworkName,
-                                                      std::string strideType) {
+std::string
+StrideSystem::getFrameworkDefaultDataType(std::string frameworkName) {
   for (auto platform : m_frameworks) {
     if ((frameworkName == platform->getRootNamespace()) ||
         frameworkName == platform->getFramework()) {
       std::string platformPath = platform->buildPlatformLibPath();
-      auto defaultType = findDefaultDataTypeInPath(platformPath, strideType);
+      auto defaultType = findDefaultDataTypeInPath(platformPath);
       return defaultType;
     }
   }
@@ -1438,15 +1438,12 @@ StrideSystem::findDataTypeInPath(std::string path, std::string strideDataType) {
   return nullptr;
 }
 
-std::string StrideSystem::findDefaultDataTypeInPath(std::string path,
-                                                    std::string strideType) {
+std::string StrideSystem::findDefaultDataTypeInPath(std::string path) {
   auto nodes = ASTFunctions::loadAllInDirectory(path);
   for (ASTNode node : nodes) {
     if (node->getNodeType() == AST::Declaration) {
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
-      if (decl->getEntityType() == "_frameworkDescription" &&
-          strideType.size() == 0) {
-        // If no stride type provided get default data type
+      if (decl->getEntityType() == "_frameworkDescription") {
         auto defaultNode = decl->getPropertyValue("defaultDataType");
         if (defaultNode) {
           if (defaultNode->getNodeType() == AST::String) {
@@ -1456,20 +1453,6 @@ std::string StrideSystem::findDefaultDataTypeInPath(std::string path,
             return ASTQuery::getNodeName(defaultNode);
           }
         }
-      } else if (decl->getEntityType() == "strideTypeDefaultDataType") {
-        auto strideTypeNode = decl->getPropertyValue("strideType");
-        if (strideTypeNode && strideTypeNode->getNodeType() == AST::String) {
-          auto strideTypeName =
-              std::static_pointer_cast<ValueNode>(strideTypeNode)
-                  ->getStringValue();
-          if (strideTypeName == strideType) {
-            auto frameworkTypeNode = decl->getPropertyValue("frameworkType");
-            if (frameworkTypeNode) {
-              return ASTQuery::getNodeName(frameworkTypeNode);
-            }
-          }
-        }
-      } else if (decl->getEntityType() == "_frameworkDescription") {
         auto importNameNode = decl->getPropertyValue("inherits");
         auto importVersionNode = decl->getPropertyValue("inheritsVersion");
         if (importNameNode && importVersionNode &&
@@ -1482,8 +1465,7 @@ std::string StrideSystem::findDefaultDataTypeInPath(std::string path,
                   ->getStringValue();
           auto inheritedPath = m_strideRoot + "/frameworks/" + importName +
                                "/" + importVersion + "/platformlib";
-          auto dataTypeDecl =
-              findDefaultDataTypeInPath(inheritedPath, strideType);
+          auto dataTypeDecl = findDefaultDataTypeInPath(inheritedPath);
           if (dataTypeDecl.size() > 0) {
             return dataTypeDecl;
           }

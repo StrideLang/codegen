@@ -25,8 +25,10 @@
 #include "gtest/gtest.h"
 
 #include "stride/codegen/coderesolver.hpp"
+#include "stride/parser/platformnode.h"
 #include "stride/utils/astfunctions.h"
 #include "stride/utils/astquery.h"
+#include "stride/utils/astvalidation.h"
 // #include "stride/codegen/stridelibrary.hpp"
 
 #include <fstream>
@@ -268,6 +270,108 @@ TEST(Resolver, ResolveTypes) {
     EXPECT_TRUE(dataType);
     EXPECT_EQ(dataType->getNodeType(), AST::None);
   }
+}
+
+TEST(Resolver, TypeClassDefaults) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree = AST::parseFile(TESTS_SOURCE_DIR "resolver/type_class.stride");
+  ASSERT_TRUE(tree != nullptr);
+  tree->addChild(
+      std::make_shared<SystemNode>("JIT", 1, 0, __FILE__, __LINE__));
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  // _Typed lists _NumericTypes in allowedTypes for its type property
+  EXPECT_TRUE(ASTQuery::findTypeClass("_NumericTypes", tree));
+  {
+    // Default comes from the first member of the typeClass
+    auto decl = ASTQuery::findDeclarationByName("Untyped", ScopeStack(), tree);
+    ASSERT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    ASSERT_TRUE(dataType);
+    ASSERT_EQ(dataType->getNodeType(), AST::Entity);
+    EXPECT_EQ(ASTQuery::getNodeName(dataType), "_RealType");
+  }
+  {
+    auto decl =
+        ASTQuery::findDeclarationByName("IntSignal", ScopeStack(), tree);
+    ASSERT_TRUE(decl);
+    auto dataType = decl->getPropertyValue("type");
+    ASSERT_TRUE(dataType);
+    EXPECT_EQ(ASTQuery::getNodeName(dataType), "_IntType");
+  }
+  {
+    // switch has a builtin data type and no type property
+    auto decl = ASTQuery::findDeclarationByName("Flag", ScopeStack(), tree);
+    ASSERT_TRUE(decl);
+    EXPECT_FALSE(decl->getPropertyValue("type"));
+  }
+  {
+    // Undeclared block receiving _SwitchType is declared as a switch
+    auto decl =
+        ASTQuery::findDeclarationByName("AutoSwitch", ScopeStack(), tree);
+    ASSERT_TRUE(decl);
+    EXPECT_EQ(decl->getEntityType(), "switch");
+    EXPECT_FALSE(decl->getPropertyValue("type"));
+    auto defaultNode = decl->getPropertyValue("default");
+    ASSERT_TRUE(defaultNode);
+    EXPECT_EQ(defaultNode->getNodeType(), AST::Switch);
+  }
+}
+
+TEST(Resolver, TypeClassRejectsNonMember) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree = AST::parseFile(TESTS_SOURCE_DIR "resolver/type_class.stride");
+  ASSERT_TRUE(tree != nullptr);
+  tree->addChild(
+      std::make_shared<SystemNode>("JIT", 1, 0, __FILE__, __LINE__));
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  // Only "signal SwitchSignal { type: _SwitchType }" is invalid, as
+  // _SwitchType is not a member of _NumericTypes
+  auto errors = ASTValidation::validate(tree);
+  int typeErrors = 0;
+  for (const auto &error : errors) {
+    if (error.type == LangError::InvalidPortType &&
+        error.errorTokens.size() == 4 && error.errorTokens[1] == "type") {
+      EXPECT_EQ(error.errorTokens[0], "signal");
+      EXPECT_NE(error.errorTokens[3].find("_RealType"), std::string::npos);
+      typeErrors++;
+    }
+  }
+  EXPECT_EQ(typeErrors, 1);
+}
+
+TEST(Resolver, ReadOnlyPortAttributes) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree =
+      AST::parseFile(TESTS_SOURCE_DIR "resolver/read_only_port.stride");
+  ASSERT_TRUE(tree != nullptr);
+  tree->addChild(
+      std::make_shared<SystemNode>("JIT", 1, 0, __FILE__, __LINE__));
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  // Only the type written on InputPort is an error. The port attributes
+  // filled in by the compiler on both ports are not.
+  auto errors = ASTValidation::validate(tree);
+  int readOnlyErrors = 0;
+  for (const auto &error : errors) {
+    if (error.type == LangError::ReadOnlyPort) {
+      ASSERT_EQ(error.errorTokens.size(), 2);
+      EXPECT_EQ(error.errorTokens[0], "mainInputPort");
+      EXPECT_EQ(error.errorTokens[1], "type");
+      readOnlyErrors++;
+    }
+  }
+  EXPECT_EQ(readOnlyErrors, 1);
 }
 
 TEST(Resolver, SelfPort) {

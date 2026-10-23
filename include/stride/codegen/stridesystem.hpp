@@ -107,8 +107,7 @@ public:
   std::shared_ptr<DeclarationNode>
   getFrameworkDataType(std::string frameworkName, std::string strideDataType);
 
-  std::string getFrameworkDefaultDataType(std::string frameworkName,
-                                          std::string strideType);
+  std::string getFrameworkDefaultDataType(std::string frameworkName);
 
   std::vector<std::shared_ptr<DeclarationNode>>
   getFrameworkOperators(std::string frameworkName);
@@ -136,8 +135,7 @@ public:
 private:
   std::shared_ptr<DeclarationNode>
   findDataTypeInPath(std::string path, std::string strideDataType);
-  std::string findDefaultDataTypeInPath(std::string path,
-                                        std::string strideType);
+  std::string findDefaultDataTypeInPath(std::string path);
 
   std::string makeProject(std::string fileName);
 

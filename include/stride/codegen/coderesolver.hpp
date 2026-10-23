@@ -75,6 +75,7 @@ private:
       ASTNode tree); // Resolve CodeGenetaror port attributes: rate, type
   void analyzeConnections();
   void resolveTypeCasting();
+  void resolveDeclarationDataTypes(); // Default type from type's typeClass
   void storeDeclarations();
   void analyzeParents();
   void analyzePersistence();
@@ -179,6 +180,17 @@ private:
                               ASTNode tree);
   void resolveTypeCastForStream(std::shared_ptr<StreamNode> stream,
                                 ScopeStack scopeStack, ASTNode tree);
+  void resolveDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
+                                     std::set<const void *> &visited);
+  std::shared_ptr<DeclarationNode>
+  getDataTypeClass(std::shared_ptr<DeclarationNode> decl);
+  std::shared_ptr<DeclarationNode> findTypeClass(std::string name,
+                                                 std::string framework);
+  void setDeclarationType(std::shared_ptr<DeclarationNode> decl, ASTNode type);
+  void setPortAttributesForBlock(std::shared_ptr<DeclarationNode> blockDecl,
+                                 std::string portName);
+  void changeDeclarationType(std::shared_ptr<DeclarationNode> decl,
+                             std::string entityType);
   void resolveTypeCastForDeclaration(std::shared_ptr<DeclarationNode> decl,
                                      ScopeStack scopeStack, ASTNode tree);
   void resolveNodeSymbols(ASTNode decl, ScopeStack scopeStack, ASTNode tree);

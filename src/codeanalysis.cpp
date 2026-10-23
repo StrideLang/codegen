@@ -1848,7 +1848,9 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
         return {getDataTypeForSignalDeclaration(decl)};
       }
       if (decl->getEntityType() == "switch" ||
-          decl->getEntityType() == "trigger") {
+          decl->getEntityType() == "trigger" ||
+          decl->getEntityType() == "string") {
+        // Builtin data type
         return {std::make_shared<EntityNode>(
             getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       } else {
@@ -1875,7 +1877,9 @@ std::vector<ASTNode> CodeAnalysis::getInputDataTypes(ASTNode node,
         return {getDataTypeForSignalDeclaration(decl)};
       }
       if (decl->getEntityType() == "switch" ||
-          decl->getEntityType() == "trigger") {
+          decl->getEntityType() == "trigger" ||
+          decl->getEntityType() == "string") {
+        // Builtin data type
         return {std::make_shared<EntityNode>(
             getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       }
@@ -1973,9 +1977,11 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
         auto type = getDataTypeForSignalDeclaration(decl);
         return {type};
       } else if (decl->getEntityType() == "switch" ||
-                 decl->getEntityType() == "trigger") {
-        return {
-            std::make_shared<EntityNode>("_SwitchType", __FILE__, __LINE__)};
+                 decl->getEntityType() == "trigger" ||
+                 decl->getEntityType() == "string") {
+        // Builtin data type
+        return {std::make_shared<EntityNode>(
+            getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       }
     } else {
       std::cerr << __FILE__ << ":" << __LINE__
@@ -1994,9 +2000,11 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
         auto type = getDataTypeForSignalDeclaration(decl);
         return {type};
       } else if (decl->getEntityType() == "switch" ||
-                 decl->getEntityType() == "trigger") {
-        return {
-            std::make_shared<EntityNode>("_SwitchType", __FILE__, __LINE__)};
+                 decl->getEntityType() == "trigger" ||
+                 decl->getEntityType() == "string") {
+        // Builtin data type
+        return {std::make_shared<EntityNode>(
+            getDataTypeForDeclaration(decl, scope, tree), __FILE__, __LINE__)};
       }
     } else {
       std::cerr << __FILE__ << ":" << __LINE__
@@ -2140,7 +2148,8 @@ CodeAnalysis::getDataTypeForDeclaration(std::shared_ptr<DeclarationNode> decl,
     }
   } else if (decl->getEntityType() == "string") {
     return "_StringType";
-  } else if (decl->getEntityType() == "switch") {
+  } else if (decl->getEntityType() == "switch" ||
+             decl->getEntityType() == "trigger") {
     return "_SwitchType";
   } else {
     //    qDebug() << __FILE__ << ":" << __LINE__ << " ERROR unsupported
@@ -2356,7 +2365,8 @@ std::vector<ASTNode> CodeAnalysis::getDomainIOEntityDeclarations(ASTNode tree) {
               auto inputDecl =
                   std::static_pointer_cast<DeclarationNode>(inputNode);
               if (inputDecl->getEntityType() == "signal" ||
-                  inputDecl->getEntityType() == "switch") {
+                  inputDecl->getEntityType() == "switch" ||
+                  inputDecl->getEntityType() == "string") {
                 decls.push_back(inputNode);
               } else {
                 std::cerr << "ERROR unexpected declaration for domain input "
@@ -2374,7 +2384,8 @@ std::vector<ASTNode> CodeAnalysis::getDomainIOEntityDeclarations(ASTNode tree) {
               auto inputDecl =
                   std::static_pointer_cast<DeclarationNode>(outputNode);
               if (inputDecl->getEntityType() == "signal" ||
-                  inputDecl->getEntityType() == "switch") {
+                  inputDecl->getEntityType() == "switch" ||
+                  inputDecl->getEntityType() == "string") {
                 decls.push_back(outputNode);
               } else {
                 std::cerr << "ERROR unexpected declaration for domain output "
