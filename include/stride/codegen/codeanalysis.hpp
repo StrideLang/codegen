@@ -161,6 +161,11 @@ public:
   getInputDataTypes(ASTNode node, const ScopeStack &scope, ASTNode tree);
   static std::vector<ASTNode>
   getOutputDataTypes(ASTNode node, const ScopeStack &scope, ASTNode tree);
+  // True if the type of the module's output block is taken from its own
+  // output port (e.g. type: OutputPort.type). Its output type can then only
+  // be resolved from a declared block connected to the output.
+  static bool
+  isOutputTypeFromOutputPort(std::shared_ptr<DeclarationNode> funcDecl);
   static ASTNode
   getDataTypeForSignalDeclaration(std::shared_ptr<DeclarationNode> decl);
   static std::string

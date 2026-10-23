@@ -367,6 +367,39 @@ void CodeResolver::resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
   }
 }
 
+void CodeResolver::markUnresolvedOutputType(ASTNode source, ASTNode target,
+                                            ScopeStack scope, ASTNode tree) {
+  // A module whose output type comes from its own output port can't give a
+  // type to an undeclared block it writes to. ASTValidation reports it.
+  if (source->getNodeType() != AST::Function ||
+      (target->getNodeType() != AST::Entity &&
+       target->getNodeType() != AST::Array)) {
+    return;
+  }
+  auto funcName = ASTQuery::getNodeName(source);
+  auto funcDecl = ASTQuery::findDeclarationByName(funcName, scope, tree);
+  if (!funcDecl) {
+    funcDecl = ASTQuery::findDeclarationByName(funcName, {}, m_tree);
+  }
+  if (!funcDecl || !CodeAnalysis::isOutputTypeFromOutputPort(funcDecl)) {
+    return;
+  }
+  auto targetName = ASTQuery::getNodeName(target);
+  auto targetDecl = ASTQuery::findDeclarationByName(targetName, scope, tree);
+  if (!targetDecl) {
+    targetDecl = ASTQuery::findDeclarationByName(targetName, {}, m_tree);
+  }
+  if (!targetDecl || !targetDecl->getCompilerProperty("autoDeclared")) {
+    return;
+  }
+  auto type = targetDecl->getPropertyValue("type");
+  if (!type || type->getNodeType() == AST::None) {
+    targetDecl->setCompilerProperty(
+        "unresolvedType",
+        std::make_shared<ValueNode>(funcDecl->getName(), __FILE__, __LINE__));
+  }
+}
+
 void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
                                              ScopeStack scope, ASTNode tree) {
   ASTNode left = stream->getLeft();
@@ -376,6 +409,9 @@ void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
   auto types = CodeAnalysis::getOutputDataTypes(left, scope, tree);
 
   if (right->getNodeType() == AST::Stream) {
+    markUnresolvedOutputType(
+        left, std::static_pointer_cast<StreamNode>(right)->getLeft(), scope,
+        tree);
     auto rightTypes = CodeAnalysis::getInputDataTypes(
         std::static_pointer_cast<StreamNode>(right)->getLeft(), scope, tree);
     if (rightTypes.size() == types.size()) {
@@ -390,6 +426,7 @@ void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
     resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right),
                               scope, tree);
   } else {
+    markUnresolvedOutputType(left, right, scope, tree);
     auto rightTypes = CodeAnalysis::getInputDataTypes(right, scope, tree);
     if (rightTypes.size() == types.size()) {
       if (right->getNodeType() == AST::List) {
@@ -1838,11 +1875,19 @@ void CodeResolver::changeDeclarationType(std::shared_ptr<DeclarationNode> decl,
 
 std::shared_ptr<DeclarationNode>
 CodeResolver::findTypeClass(std::string name, std::string framework) {
+  auto hasFramework = [](const std::shared_ptr<DeclarationNode> &decl) {
+    auto frameworkNode = decl->getCompilerProperty("framework");
+    return frameworkNode && frameworkNode->getNodeType() == AST::String &&
+           !std::static_pointer_cast<ValueNode>(frameworkNode)
+                ->getStringValue()
+                .empty();
+  };
   auto typeClass = ASTQuery::findTypeClass(name, m_tree, framework);
-  if (typeClass) {
+  if (typeClass && hasFramework(typeClass)) {
     return typeClass;
   }
-  // Not referenced yet, so bring it in from the framework
+  // Only the dummy library class (or none) is in the tree. Bring in the
+  // framework's class, which overlays it.
   auto objects = m_system->getImportTrees();
   for (const auto &objectsPair : objects) {
     for (const auto &node : objectsPair.second) {
@@ -1850,14 +1895,15 @@ CodeResolver::findTypeClass(std::string name, std::string framework) {
         continue;
       }
       auto decl = std::static_pointer_cast<DeclarationNode>(node);
-      if (decl->getEntityType() == "typeClass" && decl->getName() == name) {
+      if (decl->getEntityType() == "typeClass" && decl->getName() == name &&
+          hasFramework(decl)) {
         m_tree->addChild(decl);
         ASTFunctions::insertRequiredObjectsForNode(decl, objects, m_tree);
         return ASTQuery::findTypeClass(name, m_tree, framework);
       }
     }
   }
-  return nullptr;
+  return typeClass;
 }
 
 void CodeResolver::storeDeclarations() {

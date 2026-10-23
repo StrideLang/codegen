@@ -2018,6 +2018,21 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
     if (!funcDecl) {
       return {};
     }
+    if (funcDecl->getEntityType() == "platformModule") {
+      // Platform modules declare their output types
+      std::vector<ASTNode> types;
+      auto outputsNode = funcDecl->getPropertyValue("outputs");
+      if (outputsNode && outputsNode->getNodeType() == AST::List) {
+        for (const auto &output : outputsNode->getChildren()) {
+          if (output->getNodeType() != AST::Entity) {
+            return {};
+          }
+          types.push_back(std::make_shared<EntityNode>(
+              ASTQuery::getNodeName(output), __FILE__, __LINE__));
+        }
+      }
+      return types;
+    }
     // first check if output entity in module has a defined type
     // then check connected entities against port entity definitions
     auto outputPortBlock = ASTQuery::getModuleMainOutputPort(funcDecl);
@@ -2027,6 +2042,14 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
         auto blockNodeDecl = ASTQuery::findDeclarationByName(
             ASTQuery::getNodeName(outputEntityNode), scope,
             funcDecl->getPropertyValue("blocks"));
+        if (blockNodeDecl && (blockNodeDecl->getEntityType() == "switch" ||
+                              blockNodeDecl->getEntityType() == "trigger" ||
+                              blockNodeDecl->getEntityType() == "string")) {
+          // Builtin data type
+          return {std::make_shared<EntityNode>(
+              getDataTypeForDeclaration(blockNodeDecl, scope, tree), __FILE__,
+              __LINE__)};
+        }
         if (blockNodeDecl && blockNodeDecl->getEntityType() == "signal") {
           auto dataType = getDataTypeForSignalDeclaration(blockNodeDecl);
           if (dataType) {
@@ -2089,13 +2112,35 @@ std::vector<ASTNode> CodeAnalysis::getOutputDataTypes(ASTNode node,
     // TODO get this from the library
     auto typeName = resolveNodeOutDataType(node, scope, tree);
     return {std::make_shared<EntityNode>(typeName, __FILE__, __LINE__)};
-  } else if (node->getNodeType() == AST::Switch) {
+  } else if (node->getNodeType() == AST::Switch ||
+             node->getNodeType() == AST::String) {
     // TODO get this from the library
     auto typeName = resolveNodeOutDataType(node, scope, tree);
     return {std::make_shared<EntityNode>(typeName, __FILE__, __LINE__)};
   }
-  // TODO string literal
   return {};
+}
+
+bool CodeAnalysis::isOutputTypeFromOutputPort(
+    std::shared_ptr<DeclarationNode> funcDecl) {
+  auto outputPort = ASTQuery::getModuleMainOutputPort(funcDecl);
+  if (!outputPort) {
+    return false;
+  }
+  auto outputBlockNode = outputPort->getPropertyValue("block");
+  if (!outputBlockNode) {
+    return false;
+  }
+  auto blockDecl = ASTQuery::findDeclarationByName(
+      ASTQuery::getNodeName(outputBlockNode), {},
+      funcDecl->getPropertyValue("blocks"));
+  if (!blockDecl) {
+    return false;
+  }
+  auto typeNode = blockDecl->getPropertyValue("type");
+  return typeNode && typeNode->getNodeType() == AST::MemberAccess &&
+         std::static_pointer_cast<MemberAccessNode>(typeNode)->getEntity() ==
+             outputPort->getName();
 }
 
 ASTNode CodeAnalysis::getDataTypeForSignalDeclaration(

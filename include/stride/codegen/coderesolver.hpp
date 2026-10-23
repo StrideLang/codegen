@@ -90,6 +90,8 @@ private:
                           const ScopeStack &scope, ASTNode tree);
   void resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
                                  ScopeStack stack, ASTNode tree);
+  void markUnresolvedOutputType(ASTNode source, ASTNode target,
+                                ScopeStack scope, ASTNode tree);
   void resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
                                  ScopeStack scope, ASTNode tree);
 

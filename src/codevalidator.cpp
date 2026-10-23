@@ -190,22 +190,26 @@ void CodeValidator::validateSymbolUniqueness(ScopeStack scope,
       const auto &node = candidates[i];
       for (size_t j = i + 1; j < candidates.size(); ++j) {
         const auto &sibling = candidates[j];
-        // Check if framework matches
+        // Check if framework matches. Library declarations have no
+        // framework, so framework declarations can overlay them (e.g. the
+        // dummy _RealType in the library).
         auto nodeFrameworkNode = node->getCompilerProperty("framework");
         auto siblingFrameworkNode = sibling->getCompilerProperty("framework");
+        std::string nodeFramework;
+        std::string siblingFramework;
         if (nodeFrameworkNode &&
-            nodeFrameworkNode->getNodeType() == AST::String &&
-            siblingFrameworkNode &&
+            nodeFrameworkNode->getNodeType() == AST::String) {
+          nodeFramework = std::static_pointer_cast<ValueNode>(nodeFrameworkNode)
+                              ->getStringValue();
+        }
+        if (siblingFrameworkNode &&
             siblingFrameworkNode->getNodeType() == AST::String) {
-          auto nodeFramework =
-              std::static_pointer_cast<ValueNode>(nodeFrameworkNode)
-                  ->getStringValue();
-          auto siblingFramework =
+          siblingFramework =
               std::static_pointer_cast<ValueNode>(siblingFrameworkNode)
                   ->getStringValue();
-          if (nodeFramework != siblingFramework) {
-            continue;
-          }
+        }
+        if (nodeFramework != siblingFramework) {
+          continue;
         }
 
         // Check if scope matches
