@@ -26,6 +26,7 @@
 #include "stride/codegen/stridesystem.hpp"
 
 #include <iostream>
+#include <map>
 
 using namespace strd;
 
@@ -401,8 +402,16 @@ std::string LanguageSyntax::getDataType(std::shared_ptr<DeclarationNode> decl,
     }
   }
 
-  auto defaultDataType =
-      system->getFrameworkDefaultDataType(frameworkName, decl->getEntityType());
+  // Declarations without a type property have a builtin data type
+  static const std::map<std::string, std::string> builtinDataTypes = {
+      {"string", "_StringType"},
+      {"trigger", "_SwitchType"},
+      {"iterator", "_IntType"}};
+  std::string defaultDataType;
+  auto builtinDataType = builtinDataTypes.find(decl->getEntityType());
+  if (builtinDataType != builtinDataTypes.end()) {
+    defaultDataType = builtinDataType->second;
+  }
 
   auto dataTypeNode =
       system->getFrameworkDataType(frameworkName, defaultDataType);
@@ -410,7 +419,7 @@ std::string LanguageSyntax::getDataType(std::shared_ptr<DeclarationNode> decl,
   if (!dataTypeNode || dataTypeNode->getNodeType() == AST::None) {
     // std::cout << "undefined data type for " << decl->getEntityType()
     //           << ". Using framework default." << std::endl;
-    defaultDataType = system->getFrameworkDefaultDataType(frameworkName, "");
+    defaultDataType = system->getFrameworkDefaultDataType(frameworkName);
     dataTypeNode = system->getFrameworkDataType(frameworkName, defaultDataType);
   }
 

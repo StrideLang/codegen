@@ -1,0 +1,35 @@
+signal Untyped {}
+signal IntSignal { type: _IntType }
+signal SwitchSignal { type: _SwitchType }
+switch Flag {}
+
+platformModule IsBigger {
+    inputs: [_IntType, _IntType]
+    outputs: [_SwitchType]
+    processing: "%%outtokens:0%% = llvm::icmp sgt %%intokens:0%%, %%intokens:1%%"
+}
+
+# The output type of FromOutput comes from its output port, so it can't give
+# a type to an undeclared block.
+module FromOutput {
+    ports: [
+        mainInputPort InputPort { block: Input }
+        mainOutputPort OutputPort { block: Output }
+    ]
+    blocks: [
+        signal Input { type: _IntType }
+        signal Output { type: OutputPort.type }
+    ]
+    streams: [
+        Input >> Output;
+    ]
+}
+
+# AutoSwitch* are not declared. They must be declared as switches, not as
+# signals with _SwitchType.
+on >> AutoSwitch;
+Flag >> AutoSwitchFromFlag;
+[ 2, 1 ] >> IsBigger() >> AutoSwitchFromPlatform;
+
+# Unresolvable is not declared and its type can't be resolved.
+IntSignal >> FromOutput() >> Unresolvable;

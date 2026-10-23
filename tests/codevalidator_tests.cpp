@@ -44,6 +44,9 @@ TEST(CodeValidator, ValidTree) {
   CodeValidator validator(tree);
   EXPECT_TRUE(validator.isValid());
   EXPECT_EQ(validator.getErrors().size(), 0);
+  for (auto &error : validator.getErrors()) {
+    ADD_FAILURE() << error.getErrorText();
+  }
 }
 
 TEST(CodeValidator, InvalidStreamSizes) {

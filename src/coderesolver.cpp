@@ -36,6 +36,7 @@
 #include "stride/utils/astquery.h"
 
 #include <algorithm>
+#include <map>
 #include <cassert>
 #include <iostream>
 #include <set>
@@ -129,6 +130,7 @@ void CodeResolver::process() {
   setPortEntityAttributes({}, m_tree);
   resolveAttributes({}, m_tree);
   resolveTypeCasting();
+  resolveDeclarationDataTypes();
   analyzePersistence();
 }
 
@@ -365,6 +367,39 @@ void CodeResolver::resolveStreamTypesReverse(std::shared_ptr<StreamNode> stream,
   }
 }
 
+void CodeResolver::markUnresolvedOutputType(ASTNode source, ASTNode target,
+                                            ScopeStack scope, ASTNode tree) {
+  // A module whose output type comes from its own output port can't give a
+  // type to an undeclared block it writes to. ASTValidation reports it.
+  if (source->getNodeType() != AST::Function ||
+      (target->getNodeType() != AST::Entity &&
+       target->getNodeType() != AST::Array)) {
+    return;
+  }
+  auto funcName = ASTQuery::getNodeName(source);
+  auto funcDecl = ASTQuery::findDeclarationByName(funcName, scope, tree);
+  if (!funcDecl) {
+    funcDecl = ASTQuery::findDeclarationByName(funcName, {}, m_tree);
+  }
+  if (!funcDecl || !CodeAnalysis::isOutputTypeFromOutputPort(funcDecl)) {
+    return;
+  }
+  auto targetName = ASTQuery::getNodeName(target);
+  auto targetDecl = ASTQuery::findDeclarationByName(targetName, scope, tree);
+  if (!targetDecl) {
+    targetDecl = ASTQuery::findDeclarationByName(targetName, {}, m_tree);
+  }
+  if (!targetDecl || !targetDecl->getCompilerProperty("autoDeclared")) {
+    return;
+  }
+  auto type = targetDecl->getPropertyValue("type");
+  if (!type || type->getNodeType() == AST::None) {
+    targetDecl->setCompilerProperty(
+        "unresolvedType",
+        std::make_shared<ValueNode>(funcDecl->getName(), __FILE__, __LINE__));
+  }
+}
+
 void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
                                              ScopeStack scope, ASTNode tree) {
   ASTNode left = stream->getLeft();
@@ -374,6 +409,9 @@ void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
   auto types = CodeAnalysis::getOutputDataTypes(left, scope, tree);
 
   if (right->getNodeType() == AST::Stream) {
+    markUnresolvedOutputType(
+        left, std::static_pointer_cast<StreamNode>(right)->getLeft(), scope,
+        tree);
     auto rightTypes = CodeAnalysis::getInputDataTypes(
         std::static_pointer_cast<StreamNode>(right)->getLeft(), scope, tree);
     if (rightTypes.size() == types.size()) {
@@ -388,6 +426,7 @@ void CodeResolver::resolveStreamTypesForward(std::shared_ptr<StreamNode> stream,
     resolveStreamTypesForward(std::static_pointer_cast<StreamNode>(right),
                               scope, tree);
   } else {
+    markUnresolvedOutputType(left, right, scope, tree);
     auto rightTypes = CodeAnalysis::getInputDataTypes(right, scope, tree);
     if (rightTypes.size() == types.size()) {
       if (right->getNodeType() == AST::List) {
@@ -1701,6 +1740,171 @@ void CodeResolver::resolveTypeCasting() {
   }
 }
 
+void CodeResolver::resolveDeclarationDataTypes() {
+  std::set<const void *> visited;
+  for (const auto &node : m_tree->getChildren()) {
+    if (node->getNodeType() == AST::Declaration ||
+        node->getNodeType() == AST::ArrayDeclaration) {
+      resolveDataTypeForDeclaration(
+          std::static_pointer_cast<DeclarationNode>(node), visited);
+    }
+  }
+}
+
+void CodeResolver::resolveDataTypeForDeclaration(
+    std::shared_ptr<DeclarationNode> decl, std::set<const void *> &visited) {
+  if (visited.count(decl.get()) > 0) {
+    return;
+  }
+  visited.insert(decl.get());
+
+  // The class is looked up even when a type is given, so it is in the tree
+  // for ASTValidation to check the type against.
+  auto typeClass = getDataTypeClass(decl);
+  auto typesNode = typeClass ? typeClass->getPropertyValue("types") : nullptr;
+  auto typeNode = decl->getPropertyValue("type");
+  if (typesNode && typesNode->getChildren().size() > 0 &&
+      (!typeNode || typeNode->getNodeType() == AST::None)) {
+    // The first member of the class is the default
+    auto defaultType = ASTQuery::getNodeName(typesNode->getChildren().front());
+    decl->setPropertyValue("type", std::make_shared<EntityNode>(
+                                       defaultType, __FILE__, __LINE__));
+  }
+
+  // Recurse into internal declarations (e.g. module blocks)
+  for (const auto &property : decl->getProperties()) {
+    auto value = property->getValue();
+    if (!value) {
+      continue;
+    }
+    std::vector<ASTNode> children;
+    if (value->getNodeType() == AST::List) {
+      children = value->getChildren();
+    } else {
+      children.push_back(value);
+    }
+    for (const auto &child : children) {
+      if (child->getNodeType() == AST::Declaration ||
+          child->getNodeType() == AST::ArrayDeclaration) {
+        resolveDataTypeForDeclaration(
+            std::static_pointer_cast<DeclarationNode>(child), visited);
+      }
+    }
+  }
+}
+
+std::shared_ptr<DeclarationNode>
+CodeResolver::getDataTypeClass(std::shared_ptr<DeclarationNode> decl) {
+  // Typed declarations (e.g. signal) list a typeClass in the allowedTypes of
+  // their type property. Untyped ones (switch, string, ...) have a builtin
+  // data type and no type property.
+  std::string frameworkName;
+  auto frameworkNode = decl->getCompilerProperty("framework");
+  if (frameworkNode && frameworkNode->getNodeType() == AST::String) {
+    frameworkName =
+        std::static_pointer_cast<ValueNode>(frameworkNode)->getStringValue();
+  }
+  for (const auto &className : ASTQuery::getDataTypeClassNames(decl, m_tree)) {
+    auto typeClass = findTypeClass(className, frameworkName);
+    if (typeClass) {
+      return typeClass;
+    }
+  }
+  return nullptr;
+}
+
+void CodeResolver::setDeclarationType(std::shared_ptr<DeclarationNode> decl,
+                                      ASTNode type) {
+  auto oldType = decl->getPropertyValue("type");
+  if (oldType && oldType->getNodeType() != AST::None) {
+    return;
+  }
+  if (ASTQuery::getDataTypeClassNames(decl, m_tree).empty()) {
+    return; // Builtin data type, e.g. switch or string
+  }
+  auto typeClass = getDataTypeClass(decl);
+  if (typeClass && type->getNodeType() == AST::Entity &&
+      !ASTQuery::isTypeClassMember(typeClass, ASTQuery::getNodeName(type)) &&
+      decl->getCompilerProperty("autoDeclared")) {
+    // A compiler declared signal receiving e.g. _SwitchType becomes a switch.
+    // User declarations keep the type, which ASTValidation then rejects.
+    static const std::map<std::string, std::string> builtinTypeDeclarations = {
+        {"_SwitchType", "switch"}, {"_StringType", "string"}};
+    auto builtin = builtinTypeDeclarations.find(ASTQuery::getNodeName(type));
+    if (builtin != builtinTypeDeclarations.end()) {
+      changeDeclarationType(decl, builtin->second);
+      return;
+    }
+  }
+  decl->setPropertyValue("type", type);
+}
+
+void CodeResolver::changeDeclarationType(std::shared_ptr<DeclarationNode> decl,
+                                         std::string entityType) {
+  decl->setEntityType(entityType);
+  auto typeDecl = ASTQuery::findTypeDeclaration(decl, {}, m_tree);
+  if (!typeDecl) {
+    auto objects = m_system->getImportTrees();
+    ASTFunctions::insertRequiredObjectsForNode(decl, objects, m_tree);
+    typeDecl = ASTQuery::findTypeDeclaration(decl, {}, m_tree);
+  }
+  std::vector<std::string> portNames;
+  if (typeDecl) {
+    for (const auto &port :
+         ASTQuery::getPortsForTypeEntity(typeDecl, {}, m_tree)) {
+      auto portDecl = std::static_pointer_cast<DeclarationNode>(port);
+      auto nameNode = portDecl->getPropertyValue("name");
+      if (nameNode && nameNode->getNodeType() == AST::String) {
+        portNames.push_back(
+            std::static_pointer_cast<ValueNode>(nameNode)->getStringValue());
+      }
+    }
+  }
+  // Remove the previous type's default and properties the new type lacks
+  auto properties = decl->getProperties();
+  for (const auto &property : properties) {
+    if (property->getName() == "default" ||
+        (typeDecl && std::find(portNames.begin(), portNames.end(),
+                               property->getName()) == portNames.end())) {
+      decl->removeProperty(property);
+    }
+  }
+  ASTFunctions::fillDefaultPropertiesForNode(decl, m_tree->getChildren());
+}
+
+std::shared_ptr<DeclarationNode>
+CodeResolver::findTypeClass(std::string name, std::string framework) {
+  auto hasFramework = [](const std::shared_ptr<DeclarationNode> &decl) {
+    auto frameworkNode = decl->getCompilerProperty("framework");
+    return frameworkNode && frameworkNode->getNodeType() == AST::String &&
+           !std::static_pointer_cast<ValueNode>(frameworkNode)
+                ->getStringValue()
+                .empty();
+  };
+  auto typeClass = ASTQuery::findTypeClass(name, m_tree, framework);
+  if (typeClass && hasFramework(typeClass)) {
+    return typeClass;
+  }
+  // Only the dummy library class (or none) is in the tree. Bring in the
+  // framework's class, which overlays it.
+  auto objects = m_system->getImportTrees();
+  for (const auto &objectsPair : objects) {
+    for (const auto &node : objectsPair.second) {
+      if (node->getNodeType() != AST::Declaration) {
+        continue;
+      }
+      auto decl = std::static_pointer_cast<DeclarationNode>(node);
+      if (decl->getEntityType() == "typeClass" && decl->getName() == name &&
+          hasFramework(decl)) {
+        m_tree->addChild(decl);
+        ASTFunctions::insertRequiredObjectsForNode(decl, objects, m_tree);
+        return ASTQuery::findTypeClass(name, m_tree, framework);
+      }
+    }
+  }
+  return typeClass;
+}
+
 void CodeResolver::storeDeclarations() {
   for (const auto &node : m_tree->getChildren()) {
     storeDeclarationsForNode(node, {}, m_tree);
@@ -2232,6 +2436,9 @@ CodeResolver::createSignalDeclaration(std::string name, int size,
         std::make_shared<DeclarationNode>(arrayNode, "signal", nullptr, "", -1);
   }
   assert(newBlock);
+  // Lets the resolver turn it into a switch or string once its type is known
+  newBlock->setCompilerProperty(
+      "autoDeclared", std::make_shared<ValueNode>(true, __FILE__, __LINE__));
   ASTFunctions::fillDefaultPropertiesForNode(newBlock, tree->getChildren());
 
   ASTFunctions::resolveConstantsInNode(newBlock, scope, tree);
@@ -2245,7 +2452,8 @@ void CodeResolver::setNodeRate(ASTNode node, double rate, ScopeStack scope,
     std::shared_ptr<DeclarationNode> declaration =
         ASTQuery::findDeclarationByName(name->getName(), scope, tree,
                                         name->getNamespaceList());
-    if (declaration) {
+    // Declarations that are not rated are reactive and have no rate to set
+    if (declaration && ASTQuery::isRated(declaration, m_tree)) {
       std::shared_ptr<ValueNode> value =
           std::make_shared<ValueNode>(rate, __FILE__, __LINE__);
       declaration->replacePropertyValue("rate", value);
@@ -2256,7 +2464,7 @@ void CodeResolver::setNodeRate(ASTNode node, double rate, ScopeStack scope,
     std::shared_ptr<DeclarationNode> declaration =
         ASTQuery::findDeclarationByName(arrayNode->getName(), scope, tree,
                                         arrayNode->getNamespaceList());
-    if (declaration) {
+    if (declaration && ASTQuery::isRated(declaration, m_tree)) {
       std::shared_ptr<ValueNode> value =
           std::make_shared<ValueNode>(rate, __FILE__, __LINE__);
       if (!declaration->replacePropertyValue("rate", value)) {
@@ -2288,10 +2496,7 @@ void CodeResolver::setNodeType(ASTNode node, ASTNode type, ScopeStack scope,
         ASTQuery::findDeclarationByName(name->getName(), scope, tree,
                                         name->getNamespaceList());
     if (declaration) {
-      auto oldType = declaration->getPropertyValue("type");
-      if (oldType == nullptr || oldType->getNodeType() == AST::None) {
-        declaration->setPropertyValue("type", type);
-      }
+      setDeclarationType(declaration, type);
     }
     return;
   } else if (node->getNodeType() == AST::Array) {
@@ -2300,10 +2505,7 @@ void CodeResolver::setNodeType(ASTNode node, ASTNode type, ScopeStack scope,
         ASTQuery::findDeclarationByName(arrayNode->getName(), scope, tree,
                                         arrayNode->getNamespaceList());
     if (declaration) {
-      auto oldType = declaration->getPropertyValue("type");
-      if (oldType == nullptr || oldType->getNodeType() == AST::None) {
-        declaration->setPropertyValue("type", type);
-      }
+      setDeclarationType(declaration, type);
     }
   } else if (node->getNodeType() == AST::Function) {
     // Perhaps nothing needs to be done, as the compiler properties showing
@@ -2873,13 +3075,6 @@ void CodeResolver::declareInternalEntitiesForNode(ASTNode node,
                 portEntityDecl->replacePropertyValue(
                     "rate", std::make_shared<ValueNode>(__FILE__, __LINE__));
                 internalBlocks->addChild(portEntityDecl);
-                // TODO This default needs to be done per instance
-                ASTNode portDefault =
-                    portDeclaration->getPropertyValue("default");
-                if (portDefault && portDefault->getNodeType() != AST::None) {
-                  //                  assert(portEntityDecl->getPropertyValue("default"));
-                  portEntityDecl->replacePropertyValue("default", portDefault);
-                }
               }
               // set its domain to the port domain if not set
               auto declType = ASTQuery::findTypeDeclaration(portEntityDecl,
@@ -2906,9 +3101,10 @@ void CodeResolver::declareInternalEntitiesForNode(ASTNode node,
                       portEntityDecl->setPropertyValue("domain", portDomain);
                     }
                   }
-                  if (!portEntityDecl->getPropertyValue("rate") ||
-                      portEntityDecl->getPropertyValue("rate")->getNodeType() ==
-                          AST::None) {
+                  if (ASTQuery::isRated(portEntityDecl, m_tree) &&
+                      (!portEntityDecl->getPropertyValue("rate") ||
+                       portEntityDecl->getPropertyValue("rate")
+                               ->getNodeType() == AST::None)) {
                     portEntityDecl->setPropertyValue("rate", portRate);
                   }
                 }
@@ -3067,22 +3263,8 @@ void CodeResolver::setPortEntityAttributesForDeclaration(
 
       auto entityDecl = ASTQuery::findDeclarationByName(
           entityNode->getName(), {}, decl->getPropertyValue("blocks"));
-      if (entityDecl && entityDecl->getEntityType() != "switch") {
-        auto type = entityDecl->getPropertyValue("type");
-        if (!type || type->getNodeType() == AST::None) {
-          auto newType = std::make_shared<MemberAccessNode>(
-              inputPortNode->getName(), "type", __FILE__, __LINE__);
-          entityDecl->setPropertyValue("type", newType);
-          type = newType;
-        }
-        auto rate = entityDecl->getPropertyValue("rate");
-        if (!rate || type->getNodeType() == AST::None ||
-            (rate->getNodeType() == AST::Int &&
-             std::static_pointer_cast<ValueNode>(rate)->getIntValue() < 0)) {
-          auto newRate = std::make_shared<MemberAccessNode>(
-              inputPortNode->getName(), "rate", __FILE__, __LINE__);
-          entityDecl->setPropertyValue("rate", newRate);
-        }
+      if (entityDecl) {
+        setPortAttributesForBlock(entityDecl, inputPortNode->getName());
       }
     }
   }
@@ -3095,22 +3277,36 @@ void CodeResolver::setPortEntityAttributesForDeclaration(
 
       auto entityDecl = ASTQuery::findDeclarationByName(
           entityNode->getName(), {}, decl->getPropertyValue("blocks"));
-      if (entityDecl && entityDecl->getEntityType() != "switch") {
-        auto type = entityDecl->getPropertyValue("type");
-        if (!type || type->getNodeType() == AST::None) {
-          auto newType = std::make_shared<MemberAccessNode>(
-              outputPortNode->getName(), "type", __FILE__, __LINE__);
-          entityDecl->setPropertyValue("type", newType);
-        }
-        auto rate = entityDecl->getPropertyValue("rate");
-        if (!rate || rate->getNodeType() == AST::None ||
-            (rate->getNodeType() == AST::Int &&
-             std::static_pointer_cast<ValueNode>(rate)->getIntValue() < 0)) {
-          auto newRate = std::make_shared<MemberAccessNode>(
-              outputPortNode->getName(), "rate", __FILE__, __LINE__);
-          entityDecl->setPropertyValue("rate", newRate);
-        }
+      if (entityDecl) {
+        setPortAttributesForBlock(entityDecl, outputPortNode->getName());
       }
+    }
+  }
+}
+
+void CodeResolver::setPortAttributesForBlock(
+    std::shared_ptr<DeclarationNode> blockDecl, std::string portName) {
+  // Only typed blocks (e.g. signal) take the data type from the port. Others
+  // (switch, string, ...) have a builtin data type.
+  if (!ASTQuery::getDataTypeClassNames(blockDecl, m_tree).empty()) {
+    auto type = blockDecl->getPropertyValue("type");
+    if (!type || type->getNodeType() == AST::None) {
+      blockDecl->setPropertyValue(
+          "type",
+          std::make_shared<MemberAccessNode>(portName, "type", __FILE__,
+                                             __LINE__));
+    }
+  }
+  // Blocks that are not rated are reactive and take the rate of the writer
+  if (ASTQuery::isRated(blockDecl, m_tree)) {
+    auto rate = blockDecl->getPropertyValue("rate");
+    if (!rate || rate->getNodeType() == AST::None ||
+        (rate->getNodeType() == AST::Int &&
+         std::static_pointer_cast<ValueNode>(rate)->getIntValue() < 0)) {
+      blockDecl->setPropertyValue(
+          "rate",
+          std::make_shared<MemberAccessNode>(portName, "rate", __FILE__,
+                                             __LINE__));
     }
   }
 }
