@@ -1120,11 +1120,17 @@ void StrideSystem::injectResourceConfiguration(ASTNode tree) {
         }
         if (!configFound) {
           ASTNode propertiesList =
-              std::make_shared<ListNode>(__FILE__, __LINE__);
-          propertiesList->addChild(std::make_shared<PropertyNode>(
-              "value", decl->getPropertyValue("default"), __FILE__, __LINE__));
+              std::make_shared<ListNode>(decl->getFilename().c_str(), decl->getLine(), decl->getColumn());
+          decl->copyLocationTo(propertiesList);
+          auto valProp = std::make_shared<PropertyNode>(
+              "value", decl->getPropertyValue("default"), decl->getFilename().c_str(),
+              decl->getLine(), decl->getColumn());
+          decl->copyLocationTo(valProp);
+          propertiesList->addChild(valProp);
           auto constDecl = std::make_shared<DeclarationNode>(
-              decl->getName(), "constant", propertiesList, __FILE__, __LINE__);
+              decl->getName(), "constant", propertiesList, decl->getFilename().c_str(),
+              decl->getLine(), decl->getColumn());
+          decl->copyLocationTo(constDecl);
           if (decl->getCompilerProperty("framework")) {
             constDecl->setCompilerProperty(
                 "framework", decl->getCompilerProperty("framework"));
