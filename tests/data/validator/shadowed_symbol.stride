@@ -1,0 +1,46 @@
+switch Flag { default: on }
+signal Count { default: 0 type: _IntType }
+signal Level { default: 0.0 }
+
+# A reaction shares its domain's state, so its block Flag hides the global.
+reaction ShadowingReaction {
+    blocks: [
+        switch Flag {}
+        switch LocalOnly {}
+    ]
+    streams: [
+        LocalOnly >> Flag;
+    ]
+}
+
+# Loops are also domain members, so Count hides the global.
+loop ShadowingLoop {
+    blocks: [
+        signal Count { default: 0 type: _IntType }
+        switch Done {}
+    ]
+    terminateWhen: Done
+    streams: [
+        Count + 1 >> Count;
+        [Count, 3] >> Equal() >> Done;
+    ]
+}
+
+# Modules have their own scope: reusing a global name is allowed.
+module NotShadowingModule {
+    ports: [
+        mainInputPort InputPort {
+            block: Input
+        },
+        mainOutputPort OutputPort {
+            block: Level
+        }
+    ]
+    blocks: [
+        signal Input {},
+        signal Level {}
+    ]
+    streams: [
+        Input >> Level;
+    ]
+}

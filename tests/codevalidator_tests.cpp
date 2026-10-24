@@ -22,11 +22,13 @@
     Author: Andres Cabrera
 */
 
+#include <algorithm>
 #include <chrono>
 #include "gtest/gtest.h"
 
 #include "stride/codegen/coderesolver.hpp"
 #include "stride/codegen/codevalidator.hpp"
+#include "stride/parser/platformnode.h"
 #include "stride/utils/astfunctions.h"
 
 using namespace strd;
@@ -73,6 +75,39 @@ TEST(CodeValidator, InvalidStreamSizes) {
     }
   }
   EXPECT_TRUE(foundSizeError);
+}
+
+TEST(CodeValidator, ShadowedSymbolInReactionOrLoop) {
+  auto strideroot = ASTFunctions::getDefaultStrideRoot();
+  ASTNode tree =
+      AST::parseFile(TESTS_SOURCE_DIR "validator/shadowed_symbol.stride");
+  ASSERT_TRUE(tree != nullptr);
+  // The system brings in the library types that make reactions and loops
+  // code generators and domain members.
+  tree->addChild(
+      std::make_shared<SystemNode>("JIT", 1, 0, __FILE__, __LINE__));
+  ASTFunctions::preprocess(tree);
+
+  CodeResolver resolver(tree, strideroot);
+  resolver.process();
+
+  CodeValidator validator(tree);
+  EXPECT_FALSE(validator.isValid());
+
+  // {shadowing block, owner}
+  std::vector<std::pair<std::string, std::string>> shadowed;
+  for (auto &err : validator.getErrors()) {
+    if (err.type == LangError::ShadowedSymbol) {
+      ASSERT_EQ(err.errorTokens.size(), 4u);
+      shadowed.push_back({err.errorTokens[0], err.errorTokens[1]});
+      EXPECT_FALSE(err.getErrorText().empty());
+    }
+  }
+  std::sort(shadowed.begin(), shadowed.end());
+  std::vector<std::pair<std::string, std::string>> expected = {
+      {"Count", "ShadowingLoop"}, {"Flag", "ShadowingReaction"}};
+  // NotShadowingModule's Level is a module block, which may reuse the name.
+  EXPECT_EQ(shadowed, expected);
 }
 
 TEST(CodeValidator, InvalidBundleAccess) {

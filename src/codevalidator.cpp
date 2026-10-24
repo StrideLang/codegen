@@ -100,6 +100,7 @@ void CodeValidator::validate() {
   if (m_tree) {
     validatePlatform(m_tree, m_errors);
     ASTValidation::validateTypes(m_tree, m_errors, {}, m_tree, {}, "");
+    ASTValidation::validateShadowing(m_tree, m_errors);
 
     validateArrayIndices(m_tree, m_errors, {});
     validateArraySizes(m_tree, m_errors, {});
