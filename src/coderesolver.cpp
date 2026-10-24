@@ -2092,21 +2092,27 @@ std::shared_ptr<DeclarationNode>
 CodeResolver::createSignalDeclaration(std::string name, int size,
                                       ScopeStack scope, ASTNode tree) {
   std::shared_ptr<DeclarationNode> newBlock = nullptr;
+  const char *fname = tree ? tree->getFilename().c_str() : "";
+  int line = tree ? tree->getLine() : -1;
+  int column = tree ? tree->getColumn() : -1;
   if (size == 0) { // Is it OK to generate a signal of size 1 in this case??
     newBlock = std::make_shared<DeclarationNode>(name, "signal", nullptr,
-                                                 __FILE__, __LINE__);
+                                                 fname, line, column);
   } else if (size == 1) {
     newBlock = std::make_shared<DeclarationNode>(name, "signal", nullptr,
-                                                 __FILE__, __LINE__);
+                                                 fname, line, column);
   } else if (size > 1) {
     std::shared_ptr<ListNode> indexList = std::make_shared<ListNode>(
-        std::make_shared<ValueNode>((int64_t)size, "", -1), __FILE__, __LINE__);
+        std::make_shared<ValueNode>((int64_t)size, fname, line, column), fname, line, column);
     std::shared_ptr<ArrayNode> arrayNode =
-        std::make_shared<ArrayNode>(name, indexList, "", -1);
+        std::make_shared<ArrayNode>(name, indexList, fname, line, column);
     newBlock =
-        std::make_shared<DeclarationNode>(arrayNode, "signal", nullptr, "", -1);
+        std::make_shared<DeclarationNode>(arrayNode, "signal", nullptr, fname, line, column);
   }
   assert(newBlock);
+  if (tree) {
+    tree->copyLocationTo(newBlock);
+  }
   ASTFunctions::fillDefaultPropertiesForNode(newBlock, tree->getChildren());
 
   ASTFunctions::resolveConstantsInNode(newBlock, scope, tree);
@@ -2235,10 +2241,19 @@ CodeResolver::declareUnknownArray(std::shared_ptr<ArrayNode> arrayNode,
 
 std::shared_ptr<DeclarationNode>
 CodeResolver::createConstantDeclaration(std::string name, ASTNode value) {
+  const char *fname = value ? value->getFilename().c_str() : "";
+  int line = value ? value->getLine() : -1;
+  int column = value ? value->getColumn() : -1;
   std::shared_ptr<DeclarationNode> constant = std::make_shared<DeclarationNode>(
-      name, "constant", nullptr, __FILE__, __LINE__);
+      name, "constant", nullptr, fname, line, column);
+  if (value) {
+    value->copyLocationTo(constant);
+  }
   std::shared_ptr<PropertyNode> valueProperty =
-      std::make_shared<PropertyNode>("value", value, __FILE__, __LINE__);
+      std::make_shared<PropertyNode>("value", value, fname, line, column);
+  if (value) {
+    value->copyLocationTo(valueProperty);
+  }
   constant->addProperty(valueProperty);
   return constant;
 }
